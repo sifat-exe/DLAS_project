@@ -1,0 +1,259 @@
+{% extends 'base.html' %}
+{% load dlas_tags %}
+
+{% block title %}
+  {% tr "Conversational Intake Assistant - DLAS" "কথোপকথনমূলক আবেদন সহকারী - ডিএলএএস" %}
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 1000px; margin: 1rem auto;">
+  <div class="dashboard-header">
+    <div>
+      <h2>{% tr "Bangla Conversational Intake Assistant" "বাংলা কথোপকথনমূলক আইনি সহায়তা সহকারী" %}</h2>
+      <p style="color: var(--text-muted); font-size: 0.9rem;">
+        {% tr "Multi-turn assistive conversation to collect legal aid intake details prior to human confirmation." "আবেদনকারীর আইনি সহায়তার প্রয়োজনীয় তথ্য সংগ্রহ এবং চূড়ান্ত পর্যালোচনার জন্য সহায়ক কথোপকথন।" %}
+      </p>
+    </div>
+    <div style="display: flex; gap: 0.5rem; align-items: center;">
+      <span class="role-pill">{% tr "Simulated Conversational AI" "সিমুলেটেড কথোপকথন এআই" %}</span>
+      <form method="POST" action="{% url 'cases:conversational_intake_reset' %}" style="margin: 0;">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline btn-sm">
+          ↺ {% tr "Reset Chat" "নতুন কথোপকথন" %}
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Mandatory AI Safety Disclaimer (PRD Section 4.4 & Batch 2 Constraints) -->
+  <div class="safe-contact-box" style="background: #f8fafc; border-left: 4px solid var(--secondary-color); margin-bottom: 1.5rem;">
+    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+      <span class="badge" style="background: #e0e7ff; color: #4338ca; font-weight: 700;">{{ ai_label_en }}</span>
+      <span class="badge" style="background: #f1f5f9; color: #475569; font-weight: 600;">{{ ai_label_bn }}</span>
+    </div>
+    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">
+      <strong>{% tr "AI Safety Barrier:" "এআই নিরাপত্তা সতর্কতা:" %}</strong>
+      {% tr "This conversational assistant is strictly assistive. It cannot make legal determinations, assign lawyers, or auto-submit applications. You must review and explicitly confirm your details before an Application ID is generated." "এই সহকারী শুধুমাত্র সহায়ক তথ্য সংগ্রহের জন্য। এটি কোনো আইনি সিদ্ধান্ত নিতে পারে না। তথ্য পর্যালোচনার পর আপনার সম্মতিতেই আবেদন জমা হবে।" %}
+    </p>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem;">
+    <!-- Left Column: Chat Conversation Thread -->
+    <div class="card" style="display: flex; flex-direction: column; min-height: 520px;">
+      <div class="card-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
+        <h3 class="card-title">
+          💬 {% tr "Intake Dialogue" "কথোপকথন প্রবাহ" %}
+        </h3>
+        <span class="badge {% if status == 'review' %}badge-in-progress{% elif status == 'confirmed' %}badge-accepted{% else %}badge-submitted{% endif %}">
+          {% if status == 'review' %}
+            {% tr "Review Stage" "পর্যালোচনা পর্ব" %}
+          {% elif status == 'confirmed' %}
+            {% tr "Submitted" "দাখিল সম্পন্ন" %}
+          {% else %}
+            {% tr "In Progress" "তথ্য সংগ্রহ চলছে" %}
+          {% endif %}
+        </span>
+      </div>
+
+      <!-- Messages Thread -->
+      <div id="chat-messages" style="flex: 1; padding: 1rem 0; overflow-y: auto; max-height: 420px; display: flex; flex-direction: column; gap: 1rem;">
+        {% for turn in history %}
+          <div style="display: flex; {% if turn.role == 'user' %}justify-content: flex-end;{% else %}justify-content: flex-start;{% endif %}">
+            <div style="max-width: 80%; border-radius: 10px; padding: 0.85rem 1rem; font-size: 0.95rem; line-height: 1.5;
+                        {% if turn.role == 'user' %}
+                          background: var(--primary-color); color: #ffffff; border-bottom-right-radius: 2px;
+                        {% else %}
+                          background: #f1f5f9; color: var(--text-primary); border-bottom-left-radius: 2px; border: 1px solid var(--border-color);
+                        {% endif %}">
+              <div style="font-size: 0.75rem; margin-bottom: 0.25rem; opacity: 0.8; font-weight: 600;">
+                {% if turn.role == 'user' %}
+                  {% tr "You (Applicant)" "আপনি (আবেদনকারী)" %} • {{ turn.timestamp }}
+                {% else %}
+                  🤖 DLAS Assistant • {{ turn.timestamp }}
+                {% endif %}
+              </div>
+              <div style="white-space: pre-line;">
+                {% if request.session.django_language == 'bn' or not request.session.django_language %}
+                  {{ turn.text_bn }}
+                {% else %}
+                  {{ turn.text_en }}
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+
+        <!-- Review Card if status is review -->
+        {% if status == 'review' %}
+          <div style="background: #fdf2f8; border: 1px solid #fbcfe8; border-radius: 8px; padding: 1.25rem; margin-top: 0.5rem;">
+            <h4 style="color: #9d174d; margin-top: 0; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
+              📋 {% tr "Application Details Review" "সংগৃহীত তথ্যের সারসংক্ষেপ" %}
+            </h4>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.9rem; margin-bottom: 1rem;">
+              <div><strong>{% tr "Name:" "নাম:" %}</strong> {{ slots.name.value|default:"—" }}</div>
+              <div><strong>{% tr "Mobile:" "মোবাইল:" %}</strong> {{ slots.phone.value|default:"—" }}</div>
+              <div style="grid-column: span 2;"><strong>{% tr "Address:" "ঠিকানা:" %}</strong> {{ slots.address.value|default:"—" }}</div>
+              <div style="grid-column: span 2;"><strong>{% tr "Legal Problem:" "আইনি সমস্যা:" %}</strong> {{ slots.legal_problem.value|default:"—" }}</div>
+              <div style="grid-column: span 2;"><strong>{% tr "Incident:" "ঘটনার বিবরণ:" %}</strong> {{ slots.incident_description.value|default:"—" }}</div>
+              <div><strong>{% tr "Safe Phone:" "নিরাপদ নম্বর:" %}</strong> {{ slots.safe_contact_number.value|default:"প্রযোজ্য নয়" }}</div>
+              <div><strong>{% tr "Safe Time:" "নিরাপদ সময়:" %}</strong> {{ slots.safe_contact_time.value|default:"প্রযোজ্য নয়" }}</div>
+            </div>
+
+            <div style="border-top: 1px solid #fbcfe8; padding-top: 0.75rem; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
+              <form method="POST" action="{% url 'cases:conversational_intake_confirm' %}" style="margin: 0;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-primary" style="background: #059669; border-color: #059669;">
+                  ✓ {% tr "Confirm & Submit Application" "নিশ্চিত করুন ও আবেদন দাখিল করুন" %}
+                </button>
+              </form>
+
+              <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('user-msg-input').value='না, সংশোধন করতে চাই'; document.getElementById('user-msg-input').focus();">
+                ✏️ {% tr "Edit Information" "তথ্য সংশোধন করুন" %}
+              </button>
+
+              <form method="POST" action="{% url 'cases:conversational_intake_reset' %}" style="margin: 0;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline btn-sm">
+                  ✕ {% tr "Cancel" "বাতিল করুন" %}
+                </button>
+              </form>
+            </div>
+          </div>
+        {% endif %}
+      </div>
+
+      <!-- User Message Input Form -->
+      {% if status != 'confirmed' %}
+        <div style="border-top: 1px solid var(--border-color); padding-top: 1rem; margin-top: 0.5rem;">
+          <!-- Quick Reply Suggestion Chips -->
+          <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.75rem;">
+            {% if current_slot == 'name' %}
+              <button type="button" class="btn btn-outline btn-sm" onclick="setMsg('আমার নাম মোঃ রহিম')">আমার নাম মোঃ রহিম</button>
+              <button type="button" class="btn btn-outline btn-sm" onclick="setMsg('আমার নাম ময়ূরী আক্তার')">আমার নাম ময়ূরী আক্তার</button>
+            {% elif current_slot == 'phone' %}
+              <button type="button" class="btn btn-outline btn-sm" onclick="setMsg('আমার মোবাইল নম্বর 01712345678')">01712345678</button>
+              <button type="button" class="btn btn-outline btn-sm" onclick="setMsg('01755123456')">01755123456</button>
+            {% elif current_slot == 'legal_problem' %}
+              <button type="button" class="btn btn-outline btn-sm" onclick="setMsg('আমার জমি নিয়ে সমস্যা হয়েছে')">জমিজমা সংক্রান্ত বিরোধ</button>
+              <button type="button" class="btn btn-outline btn-sm" onclick="setMsg('বাড়িওয়ালা অন্যায়ভাবে উচ্ছেদ করতে চায়')">ভাড়াটিয়া উচ্ছেদ বিরোধ</button>
+              <button type="button" class="btn btn-outline btn-sm" onclick="setMsg('দেনমোহর ও খোরপোষ পাচ্ছি না')">দেনমোহর ও পারিবারিক বিরোধ</button>
+            {% elif current_slot == 'safe_contact_number' or current_slot == 'safe_contact_time' %}
+              <button type="button" class="btn btn-outline btn-sm" onclick="setMsg('প্রয়োজন নেই')">প্রয়োজন নেই (না)</button>
+              <button type="button" class="btn btn-outline btn-sm" onclick="setMsg('নিরাপদ নম্বর 01811223344')">01811223344</button>
+            {% endif %}
+          </div>
+
+          <form method="POST" action="{% url 'cases:conversational_intake_message' %}" style="display: flex; gap: 0.5rem;">
+            {% csrf_token %}
+            <input type="text" id="user-msg-input" name="message" class="form-input" style="flex: 1;"
+                   placeholder="{% tr 'Type your reply in Bangla or English (e.g. আমার নাম মোঃ রহিম)...' 'বাংলায় উত্তর লিখুন (যেমন: আমার নাম মোঃ রহিম)...' %}" required autofocus autocomplete="off">
+            <button type="submit" class="btn btn-primary">
+              {% tr "Send" "পাঠান" %} ↵
+            </button>
+          </form>
+        </div>
+      {% else %}
+        <div class="alert alert-success" style="margin-top: 1rem;">
+          <strong>{% tr "Application Submitted!" "আবেদন সফলভাবে দাখিল হয়েছে!" %}</strong>
+          {% tr "Your Application ID has been generated. Case ID is not created until DLAO officer acceptance." "আপনার আবেদন আইডি তৈরি হয়েছে। ডিএলএও কর্মকর্তার অনুমোদনের পূর্বে কেস আইডি তৈরি হবে না।" %}
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Right Column: Collected Slots & Provenance -->
+    <div>
+      <div class="card" style="margin-bottom: 1rem;">
+        <div class="card-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+          <h4 class="card-title">{% tr "Intake Progress" "তথ্য সংগ্রহের অগ্রগতি" %}</h4>
+        </div>
+
+        <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.88rem;">
+          <li style="display: flex; justify-content: space-between; align-items: center;">
+            <span>{% tr "Full Name" "পুরো নাম" %}:</span>
+            {% if slots.name.value %}
+              <span class="badge badge-accepted">✓ {{ slots.name.value|truncatewords:2 }}</span>
+            {% else %}
+              <span class="badge badge-under-review">{% tr "Pending" "অপেক্ষমাণ" %}</span>
+            {% endif %}
+          </li>
+          <li style="display: flex; justify-content: space-between; align-items: center;">
+            <span>{% tr "Mobile Phone" "মোবাইল নম্বর" %}:</span>
+            {% if slots.phone.value %}
+              <span class="badge badge-accepted">✓ {{ slots.phone.value }}</span>
+            {% else %}
+              <span class="badge badge-under-review">{% tr "Pending" "অপেক্ষমাণ" %}</span>
+            {% endif %}
+          </li>
+          <li style="display: flex; justify-content: space-between; align-items: center;">
+            <span>{% tr "Present Address" "ঠিকানা" %}:</span>
+            {% if slots.address.value %}
+              <span class="badge badge-accepted">✓ {{ slots.address.value|truncatewords:2 }}</span>
+            {% else %}
+              <span class="badge badge-under-review">{% tr "Pending" "অপেক্ষমাণ" %}</span>
+            {% endif %}
+          </li>
+          <li style="display: flex; justify-content: space-between; align-items: center;">
+            <span>{% tr "Legal Problem" "আইনি সমস্যা" %}:</span>
+            {% if slots.legal_problem.value %}
+              <span class="badge badge-accepted">✓ {{ slots.legal_problem.value|truncatewords:2 }}</span>
+            {% else %}
+              <span class="badge badge-under-review">{% tr "Pending" "অপেক্ষমাণ" %}</span>
+            {% endif %}
+          </li>
+          <li style="display: flex; justify-content: space-between; align-items: center;">
+            <span>{% tr "Incident Details" "ঘটনার বিবরণ" %}:</span>
+            {% if slots.incident_description.value %}
+              <span class="badge badge-accepted">✓ {{ slots.incident_description.value|truncatewords:2 }}</span>
+            {% else %}
+              <span class="badge badge-under-review">{% tr "Pending" "অপেক্ষমাণ" %}</span>
+            {% endif %}
+          </li>
+          <li style="display: flex; justify-content: space-between; align-items: center;">
+            <span>{% tr "Safe Contact" "নিরাপদ যোগাযোগ" %}:</span>
+            {% if slots.safe_contact_number.value %}
+              <span class="badge badge-accepted">✓ {{ slots.safe_contact_number.value }}</span>
+            {% else %}
+              <span class="badge badge-draft">{% tr "Optional" "ঐচ্ছিক" %}</span>
+            {% endif %}
+          </li>
+        </ul>
+      </div>
+
+      <!-- Provenance Information Card -->
+      <div class="card">
+        <div class="card-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+          <h4 class="card-title">{% tr "Data Provenance" "উপাত্তের নির্ভরযোগ্যতা" %}</h4>
+        </div>
+        <p style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; margin: 0;">
+          {% tr "Per DLAS audit integrity standards, all natural-language extracted entities retain their original applicant statement. Confirmed data is marked as" "ডিএলএএস অডিট নীতি অনুযায়ী মূল বক্তব্য অক্ষুণ্ণ রেখে নিশ্চিত তথ্যকে" %}
+          <code>applicant-confirmed</code>
+          {% tr "in the append-only CaseEvent log upon explicit confirmation." "হিসেবে সংরক্ষণ করা হয়।" %}
+        </p>
+        <div style="margin-top: 1rem;">
+          <a href="{% url 'cases:application_create' %}" class="btn btn-outline btn-sm" style="width: 100%; text-align: center;">
+            {% tr "Use Standard Form Instead" "সাধারণ ফর্ম ব্যবহার করুন" %} →
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function setMsg(text) {
+    const inp = document.getElementById('user-msg-input');
+    if (inp) {
+      inp.value = text;
+      inp.focus();
+    }
+  }
+
+  // Auto-scroll chat container to bottom
+  window.addEventListener('DOMContentLoaded', () => {
+    const el = document.getElementById('chat-messages');
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+    }
+  });
+</script>
+{% endblock %}

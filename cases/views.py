@@ -4,6 +4,9 @@ from django.utils import timezone
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.http import JsonResponse, HttpResponseForbidden
+from django.urls import reverse
+from cases.conversational_service import BanglaConversationalService
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from accounts.models import UserProfile
@@ -690,4 +693,366 @@ def officer_case_detail(request, case_id):
         'mock_sig_label_en': MockSignatureService.LABEL_EN,
         'mock_sig_label_bn': MockSignatureService.LABEL_BN,
     })
+
+
+# =============================================================================
+# BATCH 2 — FEATURE 1: BANGLA CONVERSATIONAL INTAKE
+# =============================================================================
+
+def conversational_intake_view(request):
+    """
+    Conversational Intake View (Batch 2 Part A):
+    Provides a multi-turn Bangla conversational assistant for legal aid intake.
+    Maintains server-side conversation state in request.session.
+    Collects: name, phone, address, legal_problem, incident_description, safe contact.
+    Shows review card before explicit confirmation.
+    """
+    state = request.session.get('conversational_intake')
+    if not state or not isinstance(state, dict) or 'slots' not in state:
+        state = BanglaConversationalService.init_session(user=request.user)
+        request.session['conversational_intake'] = state
+        request.session.modified = True
+
+    return render(request, 'cases/conversational_intake.html', {
+        'state': state,
+        'slots': state['slots'],
+        'history': state['history'],
+        'status': state['status'],
+        'current_slot': state.get('current_slot'),
+        'ai_label_en': BanglaConversationalService.LABEL_EN,
+        'ai_label_bn': BanglaConversationalService.LABEL_BN,
+        'ai_disclaimer_en': BanglaConversationalService.DISCLAIMER_EN,
+        'ai_disclaimer_bn': BanglaConversationalService.DISCLAIMER_BN,
+    })
+
+
+def conversational_intake_message(request):
+    """
+    Handles single-turn message submission for the conversational intake.
+    Extracts slots, processes corrections, detects missing info, and updates session state.
+    """
+    if request.method != 'POST':
+        return redirect('cases:conversational_intake')
+
+    state = request.session.get('conversational_intake')
+    if not state or not isinstance(state, dict) or 'slots' not in state:
+        state = BanglaConversationalService.init_session(user=request.user)
+
+    user_text = request.POST.get('message', '').strip()
+    if not user_text and request.body:
+        import json
+        try:
+            body_data = json.loads(request.body.decode('utf-8'))
+            user_text = body_data.get('message', '').strip()
+        except Exception:
+            pass
+
+    state, reply_bn, reply_en = BanglaConversationalService.process_turn(state, user_text)
+    request.session['conversational_intake'] = state
+    request.session.modified = True
+
+    # If AJAX/JSON request
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+        return JsonResponse({
+            'status': state['status'],
+            'reply_bn': reply_bn,
+            'reply_en': reply_en,
+            'current_slot': state.get('current_slot'),
+            'slots': state['slots'],
+            'history': state['history'],
+        })
+
+    return redirect('cases:conversational_intake')
+
+
+def conversational_intake_confirm(request):
+    """
+    Explicit applicant confirmation for conversational intake.
+    Submits application, generates Application ID, logs CaseEvent with applicant_confirmed provenance.
+    Strictly forbids creating Case ID.
+    """
+    if request.method != 'POST':
+        return redirect('cases:conversational_intake')
+
+    state = request.session.get('conversational_intake')
+    if not state or state.get('status') != 'review':
+        messages.error(request, "আবেদন নিশ্চিত করার পূর্বে সকল তথ্য সংগ্রহ সম্পন্ন হতে হবে। / All intake fields must be collected before confirmation.")
+        return redirect('cases:conversational_intake')
+
+    try:
+        app = BanglaConversationalService.confirm_and_submit(
+            state,
+            user=request.user if request.user.is_authenticated else None,
+            channel=Application.CHANNEL_WEB
+        )
+        request.session['conversational_intake'] = None
+        request.session.modified = True
+
+        messages.success(
+            request,
+            f"আপনার আবেদন সফলভাবে দাখিল হয়েছে! অ্যাপ্লিকেশন আইডি: {app.application_id} (ডিএলএও পর্যালোচনার অপেক্ষায়)"
+        )
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+            return JsonResponse({
+                'status': 'confirmed',
+                'application_id': app.application_id,
+                'redirect_url': reverse('cases:application_detail', kwargs={'application_id': app.application_id}),
+            })
+        return redirect('cases:application_detail', application_id=app.application_id)
+    except Exception as e:
+        messages.error(request, f"দাখিলে ত্রুটি: {str(e)}")
+        return redirect('cases:conversational_intake')
+
+
+def conversational_intake_reset(request):
+    """
+    Resets the conversational intake session state.
+    """
+    request.session['conversational_intake'] = None
+    request.session.modified = True
+    messages.info(request, "কথোপকথন রিসেট করা হয়েছে। নতুন করে শুরু করুন। / Conversation has been reset.")
+    return redirect('cases:conversational_intake')
+
+
+# =============================================================================
+# BATCH 2 — FEATURE 2: MOYURI'S OWN CONFIRMATION
+# =============================================================================
+
+@login_required
+def moyuri_confirmation_view(request):
+    """
+    Moyuri's Own Confirmation (Batch 2 Part B):
+    Allows applicant Moyuri to review her collected intake information, make corrections,
+    and explicitly confirm submission.
+    Creates CaseEvent with action='moyuri_confirmed', actor=Moyuri, provenance='applicant_confirmed'.
+    Guarded with strict server-side authorization / IDOR protection.
+    """
+    # Authorization & IDOR protection: only Moyuri (or citizen owner) can confirm
+    is_moyuri = (
+        request.user.username in ['moyuri', 'demo_moyuri'] or
+        request.user.first_name.strip().lower() == 'moyuri' or
+        (hasattr(request.user, 'profile') and request.user.profile.role == UserProfile.ROLE_CITIZEN and 'moyuri' in request.user.username.lower())
+    )
+    if not is_moyuri and not request.user.is_superuser:
+        raise PermissionDenied("403 Forbidden: You are not authorized to access Moyuri's confirmation workspace.")
+
+    # Load or initialize Moyuri's assisted intake data
+    intake_data = request.session.get('moyuri_intake_data') or {
+        'name': 'ময়ূরী আক্তার',
+        'phone': '01755123456',
+        'address': 'গ্রাম: রূপনগর, থানা: সাভার, জেলা: ঢাকা',
+        'legal_problem': 'জমি বেদখল ও সীমানা বিরোধ সংক্রান্ত আইনি প্রতিকার',
+        'incident_description': 'পৈতৃক বসতভিটার জমি প্রতিপক্ষ জোরপূর্বক দখল ও সীমানা প্রাচীর ভেঙে ফেলার হুমকি দিচ্ছে। স্থানীয় গণ্যমান্য ব্যক্তিদের মাধ্যমে সমাধানের চেষ্টা ব্যর্থ হয়েছে।',
+        'safe_contact_number': '01811223344',
+        'safe_contact_time': 'সকাল ১০টা - দুপুর ১টা',
+        'nid_number': '19922615500000000',
+    }
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'edit':
+            intake_data['name'] = request.POST.get('name', intake_data['name']).strip()
+            intake_data['phone'] = request.POST.get('phone', intake_data['phone']).strip()
+            intake_data['address'] = request.POST.get('address', intake_data['address']).strip()
+            intake_data['legal_problem'] = request.POST.get('legal_problem', intake_data['legal_problem']).strip()
+            intake_data['incident_description'] = request.POST.get('incident_description', intake_data['incident_description']).strip()
+            intake_data['safe_contact_number'] = request.POST.get('safe_contact_number', intake_data['safe_contact_number']).strip()
+            intake_data['safe_contact_time'] = request.POST.get('safe_contact_time', intake_data['safe_contact_time']).strip()
+            request.session['moyuri_intake_data'] = intake_data
+            request.session.modified = True
+            messages.success(request, "তথ্য সফলভাবে হালনাগাদ করা হয়েছে। অনুগ্রহ করে পর্যালোচনা করে নিশ্চিত করুন। / Information updated.")
+            return redirect('cases:moyuri_confirm')
+
+        elif action == 'confirm':
+            # Explicit Confirmation by Moyuri
+            app = submit_application(
+                name=intake_data['name'],
+                phone=intake_data['phone'],
+                address=intake_data['address'],
+                legal_problem=intake_data['legal_problem'],
+                incident_description=intake_data['incident_description'],
+                applicant_user=request.user,
+                preferred_channel=Application.CHANNEL_WEB,
+                safe_contact_number=intake_data['safe_contact_number'],
+                safe_contact_time=intake_data['safe_contact_time'],
+                language='bn',
+                nid_number=intake_data.get('nid_number', ''),
+                actor=request.user,
+                provenance=CaseEvent.PROVENANCE_APPLICANT_CONFIRMED,
+            )
+
+            # Record exact CaseEvent: moyuri_confirmed
+            CaseEvent.objects.create(
+                application=app,
+                case=None,
+                actor=request.user,
+                actor_role='citizen',
+                channel='web',
+                action='moyuri_confirmed',
+                description="Applicant Moyuri personally reviewed, verified, and explicitly confirmed her assisted intake information.",
+                provenance=CaseEvent.PROVENANCE_APPLICANT_CONFIRMED,
+                authority='applicant_personal_confirmation',
+            )
+
+            request.session['moyuri_intake_data'] = None
+            request.session.modified = True
+            messages.success(
+                request,
+                f"ধন্যবাদ ময়ূরী! আপনার আবেদন নিশ্চিত ও সফলভাবে দাখিল হয়েছে। অ্যাপ্লিকেশন আইডি: {app.application_id}।"
+            )
+            return redirect('cases:application_detail', application_id=app.application_id)
+
+    return render(request, 'cases/moyuri_confirm.html', {
+        'intake_data': intake_data,
+        'user': request.user,
+    })
+
+
+# =============================================================================
+# BATCH 2 — FEATURE 3: RIPON VOICE-ONLY TASK
+# =============================================================================
+
+@login_required
+def voice_task_view(request, task_id):
+    """
+    Ripon Voice-Only Task Workspace (Batch 2 Part C):
+    Allows Ripon (or assigned staff) to complete an assigned task via simulated voice commands.
+    IDOR protected: verifies logged-in user is strictly task.assigned_to.
+    """
+    task = get_object_or_404(Task, id=task_id)
+    if task.assigned_to != request.user and not request.user.is_superuser:
+        raise PermissionDenied("403 Forbidden: You are not authorized to view or execute this task.")
+
+    return render(request, 'cases/voice_task.html', {
+        'task': task,
+        'case_record': task.case,
+        'mock_ivr_label_en': MockIVRService.LABEL_EN,
+        'mock_ivr_label_bn': MockIVRService.LABEL_BN,
+    })
+
+
+@login_required
+def voice_task_execute(request, task_id):
+    """
+    Voice command execution endpoint.
+    Validates controlled voice vocabulary, enforces server-side ownership,
+    transitions task state to COMPLETED, and records append-only CaseEvent voice_task_completed.
+    """
+    if request.method != 'POST':
+        return redirect('cases:voice_task', task_id=task_id)
+
+    task = get_object_or_404(Task, id=task_id)
+    if task.assigned_to != request.user and not request.user.is_superuser:
+        raise PermissionDenied("403 Forbidden: IDOR violation. Cannot execute another user's task.")
+
+    if task.status == Task.STATUS_COMPLETED:
+        messages.warning(request, "এই কাজটি ইতোমধ্যে সম্পন্ন হিসেবে চিহ্নিত হয়েছে। / This task is already completed.")
+        return redirect('cases:voice_task', task_id=task.id)
+
+    command = request.POST.get('command', '').strip()
+    if not command and request.body:
+        import json
+        try:
+            bdata = json.loads(request.body.decode('utf-8'))
+            command = bdata.get('command', '').strip()
+        except Exception:
+            pass
+
+    # Normalize command
+    norm_cmd = command.lower()
+    valid_phrases = [
+        'হ্যাঁ, গ্রহণ করছি', 'হ্যাঁ', 'গ্রহণ করছি', 'কাজটি সম্পন্ন করুন', 'সম্পন্ন করুন', 'সম্পন্ন',
+        'yes', 'yes, accept', 'accept', 'complete', 'complete task', 'confirm',
+    ]
+
+    is_valid = any(p in norm_cmd for p in valid_phrases)
+
+    if not is_valid:
+        error_bn = "অস্বীকৃত ভয়েস কমান্ড। অনুগ্রহ করে 'হ্যাঁ, গ্রহণ করছি' অথবা 'সম্পন্ন করুন' বলুন।"
+        error_en = "Unrecognized voice command. Please say 'Yes, I accept' or 'Complete task'."
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+            return JsonResponse({'success': False, 'message_bn': error_bn, 'message_en': error_en}, status=400)
+        messages.error(request, f"{error_bn} / {error_en}")
+        return redirect('cases:voice_task', task_id=task.id)
+
+    # Valid command: transition task to COMPLETED
+    task.status = Task.STATUS_COMPLETED
+    task.completed_at = timezone.now()
+    task.save(update_fields=['status', 'completed_at'])
+
+    # If referral related task, update referral state if pending
+    case = task.case
+    referral = case.referrals.filter(status='pending').first()
+    if referral:
+        referral.status = 'acknowledged'
+        referral.acknowledged_at = timezone.now()
+        referral.save(update_fields=['status', 'acknowledged_at'])
+
+    # Log append-only CaseEvent: voice_task_completed
+    actor_role = getattr(request.user, 'profile', None).role if hasattr(request.user, 'profile') else 'support_staff'
+    CaseEvent.objects.create(
+        case=task.case,
+        application=task.case.application,
+        actor=request.user,
+        actor_role=actor_role,
+        channel='voice',
+        action='voice_task_completed',
+        description=f"Assigned user {request.user.username} successfully completed task '{task.title}' via voice interaction.",
+        provenance=CaseEvent.PROVENANCE_STAFF_ENTERED,
+        authority='assigned_user_voice_command',
+    )
+
+    success_bn = f"কাজ '{task.title}' সফলভাবে সম্পন্ন হয়েছে এবং অডিট সিস্টেমে সংরক্ষিত হয়েছে।"
+    success_en = f"Task '{task.title}' has been successfully completed and recorded in CaseEvent audit."
+
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+        return JsonResponse({
+            'success': True,
+            'message_bn': success_bn,
+            'message_en': success_en,
+            'task_id': task.id,
+            'status': task.status,
+            'completed_at': task.completed_at.strftime('%Y-%m-%d %H:%M'),
+        })
+
+    messages.success(request, f"{success_bn} / {success_en}")
+    return redirect('cases:voice_task', task_id=task.id)
+
+
+@login_required
+def ripon_voice_task_demo(request):
+    """
+    Direct demo jump to Ripon's assigned voice task.
+    Ensures an assigned task exists for Ripon and redirects to the voice task workspace.
+    """
+    task = Task.objects.filter(assigned_to=request.user, status=Task.STATUS_PENDING).first()
+    if not task:
+        case = CaseRecord.objects.first()
+        if not case:
+            from cases.models import Application
+            app = Application.objects.first()
+            if not app:
+                app = submit_application(
+                    name="আব্দুল করিম",
+                    phone="01711223344",
+                    address="মিরপুর, ঢাকা",
+                    legal_problem="ভাড়াটিয়া উচ্ছেদ সংক্রান্ত",
+                    incident_description="বাড়িওয়ালা কোনো লিখিত নোটিশ ছাড়াই উচ্ছেদের হুমকি দিচ্ছে।",
+                    preferred_channel=Application.CHANNEL_WEB,
+                )
+            case = accept_application(app, assigned_officer=request.user, priority='HIGH')
+
+        task = Task.objects.create(
+            case=case,
+            assigned_to=request.user,
+            title="Referral Acknowledgement: REF-16699",
+            description="Verify and acknowledge incoming referral from National Legal Aid Helpline 16699",
+            status=Task.STATUS_PENDING,
+            due_at=timezone.now() + timezone.timedelta(days=2),
+            priority='HIGH',
+        )
+
+    return redirect('cases:voice_task', task_id=task.id)
+
 

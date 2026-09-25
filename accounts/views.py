@@ -24,6 +24,37 @@ def login_view(request):
     """
     if request.method == 'POST':
         role = request.POST.get('demo_role')
+        demo_user = request.POST.get('demo_user')
+        if demo_user == 'moyuri' or role == 'moyuri':
+            user, created = User.objects.get_or_create(
+                username='moyuri',
+                defaults={'first_name': 'Moyuri', 'last_name': 'Akter'}
+            )
+            if created or not hasattr(user, 'profile'):
+                UserProfile.objects.update_or_create(
+                    user=user,
+                    defaults={'role': UserProfile.ROLE_CITIZEN, 'language': 'bn'}
+                )
+            login(request, user)
+            request.session['active_role'] = UserProfile.ROLE_CITIZEN
+            messages.success(request, "Logged in as Moyuri (Citizen - Assisted Intake Review)")
+            return redirect('cases:moyuri_confirm')
+
+        if demo_user == 'ripon' or role == 'ripon':
+            user, created = User.objects.get_or_create(
+                username='ripon',
+                defaults={'first_name': 'Ripon', 'last_name': 'Hossain'}
+            )
+            if created or not hasattr(user, 'profile'):
+                UserProfile.objects.update_or_create(
+                    user=user,
+                    defaults={'role': UserProfile.ROLE_DLAO_SUPPORT_STAFF, 'language': 'bn'}
+                )
+            login(request, user)
+            request.session['active_role'] = UserProfile.ROLE_DLAO_SUPPORT_STAFF
+            messages.success(request, "Logged in as Ripon (Support Staff - Voice Tasks)")
+            return redirect('cases:ripon_voice_task_demo')
+
         if role and role in ROLE_DASHBOARD_MAP:
             demo_username = f"demo_{role}"
             user, created = User.objects.get_or_create(

@@ -13,8 +13,11 @@
       {% tr "Assisting officers, permitted case history lookups, and document verification." "কর্মকর্তাদের সহায়তা, অনুমোদিত মামলার ইতিহাস অনুসন্ধান ও নথি যাচাইকরণ।" %}
     </p>
   </div>
-  <div>
+  <div style="display: flex; gap: 0.5rem; align-items: center;">
     <span class="role-pill">{% tr "Role: Support Staff" "রোল: সহায়ক কর্মী" %}</span>
+    <a href="{% url 'cases:ripon_voice_task_demo' %}" class="btn btn-primary btn-sm" style="background: #0284c7; border-color: #0284c7;">
+      🎙️ {% tr "Voice Task Workspace" "ভয়েস টাস্ক কর্মক্ষেত্র" %}
+    </a>
   </div>
 </div>
 

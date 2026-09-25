@@ -1,0 +1,162 @@
+{% extends 'base.html' %}
+{% load dlas_tags %}
+
+{% block title %}
+  {% tr "Voice Task Workspace - DLAS" "ভয়েস টাস্ক কর্মক্ষেত্র - ডিএলএএস" %}
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 850px; margin: 1rem auto;">
+  <div class="dashboard-header">
+    <div>
+      <h2>{% tr "Voice-Only Task Assistant" "ভয়েস টাস্ক সহকারী কর্মক্ষেত্র" %}</h2>
+      <p style="color: var(--text-muted); font-size: 0.9rem;">
+        {% tr "Simulated voice-driven task acknowledgement and execution for assigned operational staff." "দায়িত্বপ্রাপ্ত কর্মীদের জন্য সিমুলেটেড ভয়েস কমান্ডের মাধ্যমে কাজ গ্রহণ ও নিষ্পত্তিকরণ।" %}
+      </p>
+    </div>
+    <div style="display: flex; gap: 0.5rem; align-items: center;">
+      <span class="role-pill">🎙️ {% tr "Voice Assisted" "ভয়েস সহায়তাকৃত" %}</span>
+      <span class="badge {% if task.status == 'completed' %}badge-accepted{% else %}badge-in-progress{% endif %}">
+        {{ task.get_status_display }}
+      </span>
+    </div>
+  </div>
+
+  <!-- Voice Safety & Authorization Notice -->
+  <div class="safe-contact-box" style="background: #f8fafc; border-left: 4px solid var(--secondary-color); margin-bottom: 1.5rem;">
+    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+      <span class="badge" style="background: #e0f2fe; color: #0369a1; font-weight: 700;">{{ mock_ivr_label_en }}</span>
+      <span class="badge badge-accepted">{% tr "Strict Server-Side Auth" "সার্ভার-সাইড নিরাপত্তা সংরক্ষিত" %}</span>
+    </div>
+    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">
+      <strong>{% tr "Voice Security Protocol:" "ভয়েস নিরাপত্তা প্রোটোকল:" %}</strong>
+      {% tr "Voice commands never bypass authorization. Server verifies that you are the strictly assigned owner of this task before executing state transitions or recording append-only CaseEvents." "ভয়েস কমান্ড কখনোই সার্ভার অনুমোদন বাইপাস করতে পারে না। শুধুমাত্র এই কাজে সুনির্দিষ্টভাবে দায়িত্বপ্রাপ্ত কর্মীই এটি সম্পন্ন করতে পারেন।" %}
+    </p>
+  </div>
+
+  <!-- Interactive Voice Assistant Card -->
+  <div class="card" style="margin-bottom: 1.5rem; text-align: center; padding: 2rem 1.5rem;">
+    <div style="display: inline-flex; align-items: center; justify-content: center; width: 72px; height: 72px; border-radius: 50%;
+                {% if task.status == 'completed' %}background: #dcfce7; color: #15803d;{% else %}background: #e0f2fe; color: #0284c7; animation: pulse 2s infinite;{% endif %}
+                margin-bottom: 1rem; font-size: 2rem;">
+      {% if task.status == 'completed' %}✓{% else %}🎙️{% endif %}
+    </div>
+
+    <!-- System Voice Prompt -->
+    <div style="background: #f1f5f9; border-radius: 8px; padding: 1rem 1.5rem; max-width: 650px; margin: 0 auto 1.5rem; text-align: left; border-left: 4px solid var(--primary-color);">
+      <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.25rem;">
+        🤖 {% tr "System Voice Prompt" "সিস্টেমের ভয়েস নির্দেশিকা" %}
+      </div>
+      <div style="font-size: 1.05rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">
+        "আপনার নির্ধারিত কাজ: {{ task.title }}। আপনি কি এটি গ্রহণ ও সম্পন্ন করছেন?"
+      </div>
+      <div style="font-size: 0.85rem; color: var(--text-secondary); font-style: italic;">
+        "Your assigned task: {{ task.title }}. Do you accept and mark this task as completed?"
+      </div>
+    </div>
+
+    {% if task.status == 'completed' %}
+      <div class="alert alert-success" style="max-width: 650px; margin: 0 auto; text-align: left;">
+        <h4 style="margin: 0 0 0.5rem 0;">✓ {% tr "Task Successfully Completed" "কাজটি সফলভাবে সম্পন্ন হয়েছে" %}</h4>
+        <p style="margin: 0; font-size: 0.9rem;">
+          {% tr "Completed at" "সম্পন্নের সময়" %}: {{ task.completed_at|date:"d M Y, h:i A" }} |
+          {% tr "Action logged in CaseEvent append-only audit trail as" "কেস ইভেন্টে অডিট সংরক্ষিত" %}: <code>voice_task_completed</code>
+        </p>
+      </div>
+    {% else %}
+      <!-- Simulated Voice Command Trigger Buttons -->
+      <div style="margin-bottom: 1.5rem;">
+        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+          {% tr "Speak into your microphone or click a simulated voice phrase below:" "মাইক্রোফোনে বলুন অথবা নিচের যেকোনো একটি ভয়েস কমান্ডে ক্লিক করুন:" %}
+        </p>
+        <div style="display: flex; justify-content: center; flex-wrap: wrap; gap: 0.75rem;">
+          <form method="POST" action="{% url 'cases:voice_task_execute' task.id %}" style="margin: 0;">
+            {% csrf_token %}
+            <input type="hidden" name="command" value="হ্যাঁ, গ্রহণ করছি">
+            <button type="submit" class="btn btn-primary" style="background: #0284c7; border-color: #0284c7; font-weight: 600; display: inline-flex; align-items: center; gap: 0.5rem;">
+              🎙️ "হ্যাঁ, গ্রহণ করছি" / "Yes, I accept"
+            </button>
+          </form>
+
+          <form method="POST" action="{% url 'cases:voice_task_execute' task.id %}" style="margin: 0;">
+            {% csrf_token %}
+            <input type="hidden" name="command" value="কাজটি সম্পন্ন করুন">
+            <button type="submit" class="btn btn-primary" style="background: #059669; border-color: #059669; font-weight: 600; display: inline-flex; align-items: center; gap: 0.5rem;">
+              ✓ "কাজটি সম্পন্ন করুন" / "Complete task"
+            </button>
+          </form>
+
+          <button type="button" class="btn btn-outline" onclick="simulateInvalidCommand();" style="color: #64748b;">
+            ⚠️ {% tr "Test Invalid Voice Command" "ভুল ভয়েস কমান্ড পরীক্ষা" %}
+          </button>
+        </div>
+      </div>
+
+      <!-- Optional Speech Input Field / Mic Recognition -->
+      <form method="POST" action="{% url 'cases:voice_task_execute' task.id %}" style="max-width: 500px; margin: 0 auto; display: flex; gap: 0.5rem;">
+        {% csrf_token %}
+        <input type="text" id="voice-input-text" name="command" class="form-input" placeholder="{% tr 'Say or type command (e.g. হ্যাঁ, গ্রহণ করছি)...' 'ভয়েস কমান্ড লিখুন (যেমন: হ্যাঁ, গ্রহণ করছি)...' %}" required>
+        <button type="button" id="mic-btn" class="btn btn-secondary" onclick="startSpeechRecognition();" title="Use Browser Speech Recognition">
+          🎤
+        </button>
+        <button type="submit" class="btn btn-primary">
+          {% tr "Execute" "সম্পন্ন" %}
+        </button>
+      </form>
+    {% endif %}
+  </div>
+
+  <!-- Task & Case Record Details Card -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">{% tr "Task & Case Record Details" "কাজের বিবরণ ও সংশ্লিষ্ট মামলা" %}</h3>
+      <span class="badge badge-submitted">{{ task.case.case_id }}</span>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; font-size: 0.9rem;">
+      <div><strong>{% tr "Task Title:" "কাজের শিরোনাম:" %}</strong> {{ task.title }}</div>
+      <div><strong>{% tr "Assigned Staff:" "দায়িত্বপ্রাপ্ত কর্মী:" %}</strong> {{ task.assigned_to.username }}</div>
+      <div><strong>{% tr "Priority:" "অগ্রাধিকার:" %}</strong> <span class="badge {% if task.priority == 'HIGH' %}badge-urgent{% else %}badge-in-progress{% endif %}">{{ task.get_priority_display }}</span></div>
+      <div><strong>{% tr "Due Date:" "সময়সীমা:" %}</strong> {{ task.due_at|date:"d M Y, h:i A" }}</div>
+      <div style="grid-column: span 2;"><strong>{% tr "Task Description:" "কাজের বর্ণনা:" %}</strong> {{ task.description|default:"—" }}</div>
+      <div style="grid-column: span 2;"><strong>{% tr "Associated Case Incident:" "সংশ্লিষ্ট মামলার ঘটনা:" %}</strong> {{ task.case.application.incident_description|truncatewords:20 }}</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function simulateInvalidCommand() {
+    const inp = document.getElementById('voice-input-text');
+    if (inp) {
+      inp.value = "আজকের আবহাওয়া কেমন?";
+      inp.form.submit();
+    }
+  }
+
+  function startSpeechRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("{% tr 'Browser speech recognition is not supported in this browser. Please use the simulated voice buttons above.' 'এই ব্রাউজারে স্পিচ রিকগনিশন সমর্থিত নয়। অনুগ্রহ করে উপরের সিমুলেটেড বাটন ব্যবহার করুন।' %}");
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'bn-BD';
+    recognition.onresult = function(event) {
+      const transcript = event.results[0][0].transcript;
+      const inp = document.getElementById('voice-input-text');
+      if (inp) {
+        inp.value = transcript;
+        inp.form.submit();
+      }
+    };
+    recognition.start();
+  }
+</script>
+
+<style>
+  @keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+    100% { transform: scale(1); }
+  }
+</style>
+{% endblock %}

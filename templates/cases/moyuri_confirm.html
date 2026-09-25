@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% load dlas_tags %}
+
+{% block title %}
+  {% tr "Moyuri Confirmation Review - DLAS" "ময়ূরীর আবেদন পর্যালোচনা ও নিশ্চিতকরণ - ডিএলএএস" %}
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 1rem auto;">
+  <div class="dashboard-header">
+    <div>
+      <h2>{% tr "Moyuri's Personal Intake Confirmation" "ময়ূরী আক্তারের আবেদনপত্র পর্যালোচনা ও নিশ্চিতকরণ" %}</h2>
+      <p style="color: var(--text-muted); font-size: 0.9rem;">
+        {% tr "Personal verification of intake information collected via assisted intake before official submission." "সহায়তাকৃত বা কথোপকথন মাধ্যমে সংগৃহীত তথ্যাবলী ব্যক্তিগতভাবে যাচাই ও চূড়ান্ত নিশ্চিতকরণ।" %}
+      </p>
+    </div>
+    <div>
+      <span class="role-pill" style="background: #fdf2f8; color: #be185d; border: 1px solid #fbcfe8;">
+        🌸 {% tr "Applicant: Moyuri Akter" "আবেদনকারী: ময়ূরী আক্তার" %}
+      </span>
+    </div>
+  </div>
+
+  <!-- Safe Contact Notice & Non-Decision Notice -->
+  <div class="safe-contact-box" style="background: #f8fafc; border-left: 4px solid var(--secondary-color); margin-bottom: 1.5rem;">
+    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+      <span class="badge badge-submitted">{% tr "Applicant Confirmation Step" "আবেদনকারীর নিজস্ব নিশ্চিতকরণ ধাপ" %}</span>
+      <span class="badge badge-accepted">{% tr "Append-Only Audit Logged" "স্থায়ী অডিটে সংরক্ষিত" %}</span>
+    </div>
+    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">
+      <strong>{% tr "Human Agency Guarantee:" "ব্যক্তিগত নিশ্চিতকরণ নিশ্চয়তা:" %}</strong>
+      {% tr "Per PRD and AI Safety specifications, this step records Moyuri's personal review and explicit confirmation. Confirmation does NOT decide legal eligibility, priority, fraud, or lawyer assignment—it strictly verifies intake facts under applicant authority." "এই ধাপটি ময়ূরীর ব্যক্তিগত পর্যালোচনা ও চূড়ান্ত সম্মতি লিপিবদ্ধ করে। এটি কোনো চূড়ান্ত আইনি সিদ্ধান্ত বা আইনজীবী নিয়োগ করে না—শুধুমাত্র তথ্যের সত্যতা নিশ্চিত করে।" %}
+    </p>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">{% tr "Review Collected Information" "সংগৃহীত তথ্য পরীক্ষা করুন" %}</h3>
+      <span class="badge badge-in-progress">{% tr "Awaiting Your Confirmation" "আপনার সম্মতির অপেক্ষায়" %}</span>
+    </div>
+
+    <form method="POST" action="{% url 'cases:moyuri_confirm' %}">
+      {% csrf_token %}
+
+      <div class="form-group">
+        <label class="form-label" for="id_name">{% tr "Full Name" "আবেদনকারীর পুরো নাম" %} *</label>
+        <input type="text" id="id_name" name="name" class="form-input" value="{{ intake_data.name }}" required>
+        <span class="form-hint">{% tr "Your official legal name" "আপনার জাতীয় পরিচয়পত্র বা নাগরিক নাম" %}</span>
+      </div>
+
+      <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div class="form-group">
+          <label class="form-label" for="id_phone">{% tr "Contact Phone" "মোবাইল নম্বর" %} *</label>
+          <input type="text" id="id_phone" name="phone" class="form-input" value="{{ intake_data.phone }}" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="id_safe_phone">{% tr "Safe Contact Number" "নিরাপদ বিকল্প নম্বর" %}</label>
+          <input type="text" id="id_safe_phone" name="safe_contact_number" class="form-input" value="{{ intake_data.safe_contact_number }}">
+          <span class="form-hint">{% tr "Discreet number for sensitive updates" "গোপনীয় যোগাযোগের বিকল্প নম্বর" %}</span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="id_safe_time">{% tr "Safe Contact Hours" "নিরাপদ যোগাযোগের উপযুক্ত সময়" %}</label>
+        <input type="text" id="id_safe_time" name="safe_contact_time" class="form-input" value="{{ intake_data.safe_contact_time }}">
+        <span class="form-hint">{% tr "e.g. Morning 10am - 1pm" "যেমন: সকাল ১০টা - দুপুর ১টা" %}</span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="id_address">{% tr "Present Address" "বর্তমান ঠিকানা" %} *</label>
+        <textarea id="id_address" name="address" class="form-textarea" rows="2" required>{{ intake_data.address }}</textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="id_legal_problem">{% tr "Legal Problem Category" "আইনি সমস্যার ধরন" %} *</label>
+        <input type="text" id="id_legal_problem" name="legal_problem" class="form-input" value="{{ intake_data.legal_problem }}" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="id_incident">{% tr "Incident Description" "ঘটনার বিস্তারিত বিবরণ" %} *</label>
+        <textarea id="id_incident" name="incident_description" class="form-textarea" rows="4" required>{{ intake_data.incident_description }}</textarea>
+      </div>
+
+      <div style="border-top: 1px solid var(--border-color); padding-top: 1.25rem; display: flex; justify-content: space-between; align-items: center;">
+        <button type="submit" name="action" value="edit" class="btn btn-secondary">
+          ✏️ {% tr "Save Corrections" "তথ্য সংশোধন করুন" %}
+        </button>
+
+        <button type="submit" name="action" value="confirm" class="btn btn-primary" style="background: #059669; border-color: #059669; font-size: 1rem; padding: 0.6rem 1.25rem;">
+          ✓ {% tr "Confirm My Legal Aid Application" "আমার আবেদন নিশ্চিত ও দাখিল করুন" %}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

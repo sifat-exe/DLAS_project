@@ -15,11 +15,26 @@
   </div>
   <div style="display: flex; gap: 0.5rem; align-items: center;">
     <span class="role-pill">{% tr "Role: Citizen" "রোল: নাগরিক" %}</span>
+    <a href="{% url 'cases:conversational_intake' %}" class="btn btn-secondary btn-sm">
+      💬 {% tr "Chat Intake" "চ্যাট আবেদন" %}
+    </a>
     <a href="{% url 'cases:application_create' %}" class="btn btn-primary btn-sm">
       + {% tr "New Application" "নতুন আবেদন" %}
     </a>
   </div>
 </div>
+
+{% if request.user.username == 'moyuri' or request.user.username == 'demo_moyuri' or 'moyuri' in request.user.username %}
+<div class="safe-contact-box" style="background: #fdf2f8; border-left: 4px solid #db2777; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+  <div>
+    <strong>🌸 {% tr "Moyuri's Assisted Intake Pending:" "ময়ূরীর সহায়তাকৃত আবেদন নিশ্চিতকরণের অপেক্ষায়:" %}</strong>
+    {% tr "Your legal aid intake details are ready for your personal confirmation." "আপনার আইনি সহায়তার তথ্যাবলী পর্যালোচনার জন্য প্রস্তুত।" %}
+  </div>
+  <a href="{% url 'cases:moyuri_confirm' %}" class="btn btn-sm btn-primary" style="background: #db2777; border-color: #db2777;">
+    {% tr "Review & Confirm Now →" "পর্যালোচনা ও নিশ্চিত করুন →" %}
+  </a>
+</div>
+{% endif %}
 
 <!-- Safe Contact Notice -->
 <div class="safe-contact-box">
