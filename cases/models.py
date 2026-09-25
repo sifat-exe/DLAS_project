@@ -34,6 +34,18 @@ class Application(models.Model):
         (CHANNEL_WALK_IN, 'Office Walk-in'),
     ]
 
+    NID_STATUS_NOT_VERIFIED = 'not_verified'
+    NID_STATUS_PENDING = 'verification_pending'
+    NID_STATUS_VERIFIED = 'verified'
+    NID_STATUS_FAILED = 'verification_failed'
+
+    NID_STATUS_CHOICES = [
+        (NID_STATUS_NOT_VERIFIED, 'Not verified'),
+        (NID_STATUS_PENDING, 'Verification pending'),
+        (NID_STATUS_VERIFIED, 'Verified'),
+        (NID_STATUS_FAILED, 'Verification failed'),
+    ]
+
     application_id = models.CharField(max_length=64, unique=True, db_index=True)
     applicant_user = models.ForeignKey(
         User,
@@ -51,9 +63,19 @@ class Application(models.Model):
     safe_contact_number = models.CharField(max_length=32, blank=True)
     safe_contact_time = models.CharField(max_length=128, blank=True)
     language = models.CharField(max_length=10, default='en')
+    nid_number = models.CharField(max_length=32, blank=True, default='')
+    nid_verification_status = models.CharField(
+        max_length=32,
+        choices=NID_STATUS_CHOICES,
+        default=NID_STATUS_NOT_VERIFIED
+    )
     status = models.CharField(max_length=32, choices=STATUS_CHOICES, default=STATUS_SUBMITTED)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def is_nid_verified(self):
+        return self.nid_verification_status == self.NID_STATUS_VERIFIED
 
     class Meta:
         ordering = ['-created_at']

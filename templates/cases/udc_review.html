@@ -61,6 +61,22 @@
             <td>UDC Assisted ({{ form_data.language|upper }})</td>
           </tr>
           <tr>
+            <th>{% tr "National ID (NID)" "জাতীয় পরিচয়পত্র" %}</th>
+            <td>
+              {% if form_data.nid_number %}
+                <code>{{ form_data.nid_number }}</code>
+              {% else %}
+                <span style="color: var(--text-muted);">{% tr "Not provided (Optional)" "প্রদান করা হয়নি (ঐচ্ছিক)" %}</span>
+              {% endif %}
+              <div style="margin-top: 0.25rem;">
+                <span class="badge badge-draft">{% tr "Not verified" "যাচাই করা হয়নি" %}</span>
+                <span style="font-size: 0.8rem; color: var(--text-muted); margin-left: 0.4rem;">
+                  {% tr "(Not verified does not affect eligibility or mean fraudulent/rejected)" "(যাচাই না করা হলেও এটি আবেদন বাতিল বা জাল বোঝায় না)" %}
+                </span>
+              </div>
+            </td>
+          </tr>
+          <tr>
             <th>{% tr "Informed Consent & Read-Back" "সচেতন সম্মতি ও পাঠ" %}</th>
             <td><span class="badge badge-accepted">✓ {% tr "Verified by Operator" "অপারেটর কর্তৃক যাচাইকৃত" %}</span></td>
           </tr>
@@ -74,6 +90,7 @@
       <input type="hidden" name="name" value="{{ form_data.name }}">
       <input type="hidden" name="phone" value="{{ form_data.phone }}">
       <input type="hidden" name="address" value="{{ form_data.address }}">
+      <input type="hidden" name="nid_number" value="{{ form_data.nid_number|default:'' }}">
       <input type="hidden" name="legal_problem" value="{{ form_data.legal_problem }}">
       <input type="hidden" name="incident_description" value="{{ form_data.incident_description }}">
       <input type="hidden" name="preferred_channel" value="{{ form_data.preferred_channel }}">

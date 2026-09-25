@@ -45,11 +45,22 @@ class CitizenApplicationForm(forms.Form):
         required=False,
         widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'যোগাযোগের নিরাপদ সময় (যেমন: সকাল ১০টা - ১২টা) / Safe Contact Time'})
     )
+    nid_number = forms.CharField(
+        max_length=32,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-input',
+            'placeholder': 'জাতীয় পরিচয়পত্র নম্বর (ঐচ্ছিক) / NID Number (Optional)'
+        })
+    )
     language = forms.ChoiceField(
         choices=[('bn', 'বাংলা (Bangla)'), ('en', 'English')],
         initial='bn',
         widget=forms.Select(attrs={'class': 'form-select'})
     )
+
+    def clean_nid_number(self):
+        return self.cleaned_data.get('nid_number', '').strip()
 
     def clean_name(self):
         name = self.cleaned_data.get('name', '').strip()

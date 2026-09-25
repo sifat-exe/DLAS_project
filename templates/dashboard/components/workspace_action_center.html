@@ -1,0 +1,170 @@
+{% load dlas_tags %}
+
+<!-- Role-Specific Action Center (Batch 1 Features 3, 4, 5, 7) -->
+<div class="workspace-action-center" style="margin-bottom: 2rem;">
+
+  <!-- SECTION C: NEXT STEP (Top Workflow Action) -->
+  {% if ctx.top_next_step %}
+    <div class="card" style="border-left: 5px solid {% if ctx.top_next_step.is_urgent %}#ef4444{% else %}var(--primary-color){% endif %}; background: {% if ctx.top_next_step.is_urgent %}#fef2f2{% else %}#f8fafc{% endif %}; margin-bottom: 1.5rem; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+        <div style="flex: 1; min-width: 280px;">
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem;">
+            <span class="badge" style="background: {% if ctx.top_next_step.is_urgent %}#fee2e2; color: #991b1b; border: 1px solid #f87171;{% else %}#e0e7ff; color: #3730a3; border: 1px solid #c7d2fe;{% endif %} font-weight: 700;">
+              {% if ctx.top_next_step.is_urgent %}🚨 {% tr "URGENT NEXT STEP" "জরুরি পরবর্তী ধাপ" %}{% else %}📌 {% tr "NEXT STEP" "পরবর্তী ধাপ" %}{% endif %}
+            </span>
+            <code style="font-weight: 700; color: var(--text-primary);">{{ ctx.top_next_step.target_id }}</code>
+          </div>
+          <h3 style="margin: 0.25rem 0 0.4rem 0; color: {% if ctx.top_next_step.is_urgent %}#991b1b{% else %}var(--primary-color){% endif %}; font-size: 1.15rem;">
+            {% tr ctx.top_next_step.headline_en ctx.top_next_step.headline_bn %}
+          </h3>
+          <p style="margin: 0; color: var(--text-secondary); font-size: 0.92rem; line-height: 1.45;">
+            {% tr ctx.top_next_step.instruction_en ctx.top_next_step.instruction_bn %}
+          </p>
+        </div>
+        <div>
+          <a href="{{ ctx.top_next_step.url }}" class="btn btn-primary" style="background-color: {% if ctx.top_next_step.is_urgent %}#dc2626{% else %}var(--primary-color){% endif %}; white-space: nowrap; padding: 0.6rem 1.25rem; font-weight: 600;">
+            {% tr ctx.top_next_step.action_btn_en ctx.top_next_step.action_btn_bn %} →
+          </a>
+        </div>
+      </div>
+    </div>
+  {% else %}
+    <div class="card" style="border-left: 4px solid var(--success-color); background: #f0fdf4; margin-bottom: 1.5rem; padding: 1rem 1.25rem;">
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <span style="font-size: 1.5rem;">🎉</span>
+        <div>
+          <strong style="color: #166534; font-size: 0.95rem; display: block;">
+            {% tr "Next Step: All Caught Up!" "পরবর্তী ধাপ: সকল কার্যক্রম সম্পন্ন!" %}
+          </strong>
+          <span style="color: #15803d; font-size: 0.85rem;">
+            {% tr "No immediate pending actions requiring your intervention." "আপনার তাৎক্ষণিক সিদ্ধান্তের অপেক্ষায় কোনো কাজ অবশিষ্ট নেই।" %}
+          </span>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  <!-- GRID: SECTION A & SECTION B -->
+  <div class="grid-2" style="gap: 1.5rem;">
+
+    <!-- SECTION A: WHAT TO DO NEXT -->
+    <div class="card" style="display: flex; flex-direction: column;">
+      <div class="card-header">
+        <h3 class="card-title">
+          📋 {% tr "What To Do Next" "পরবর্তী করণীয়" %}
+        </h3>
+        <span class="badge {% if ctx.urgent_count > 0 %}badge-danger{% else %}badge-under-review{% endif %}">
+          {{ ctx.pending_count|default:0 }} {% tr "Pending" "অপেক্ষমাণ" %}
+        </span>
+      </div>
+
+      {% if ctx.pending_actions %}
+        <div style="display: flex; flex-direction: column; gap: 0.75rem; flex: 1;">
+          {% for item in ctx.pending_actions %}
+            <div style="padding: 0.75rem 0.9rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: #ffffff; display: flex; justify-content: space-between; align-items: center; gap: 0.75rem;">
+              <div style="flex: 1; min-width: 0;">
+                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.2rem;">
+                  {% if item.priority == 'URGENT' %}
+                    <span class="badge" style="background: #fee2e2; color: #991b1b; font-size: 0.7rem; padding: 0.15rem 0.4rem; font-weight: 700;">
+                      🚨 {% tr item.priority_label_en item.priority_label_bn %}
+                    </span>
+                  {% elif item.priority == 'HIGH' %}
+                    <span class="badge" style="background: #ffedd5; color: #9a3412; font-size: 0.7rem; padding: 0.15rem 0.4rem; font-weight: 600;">
+                      ⚡ {% tr item.priority_label_en item.priority_label_bn %}
+                    </span>
+                  {% else %}
+                    <span class="badge" style="background: #e0f2fe; color: #0369a1; font-size: 0.7rem; padding: 0.15rem 0.4rem;">
+                      {% tr item.priority_label_en item.priority_label_bn %}
+                    </span>
+                  {% endif %}
+                  <code style="font-size: 0.8rem;">{{ item.identifier }}</code>
+                </div>
+                <div style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
+                  {% tr item.title_en item.title_bn %}
+                </div>
+                <div style="font-size: 0.8rem; color: var(--text-muted); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
+                  {% tr item.detail_en item.detail_bn %}
+                </div>
+              </div>
+              <div>
+                <a href="{{ item.url }}" class="btn btn-secondary btn-sm" style="white-space: nowrap; font-size: 0.8rem;">
+                  {% tr item.action_text_en item.action_text_bn %}
+                </a>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-state" style="padding: 2.5rem 1rem;">
+          <div class="empty-state-icon">✅</div>
+          <h3>{% tr "Nothing Pending" "কোনো কাজ অপেক্ষমাণ নেই" %}</h3>
+          <p style="font-size: 0.85rem; color: var(--text-muted);">
+            {% tr "You have no outstanding operational tasks requiring action right now." "বর্তমানে আপনার নিষ্পত্তির জন্য কোনো অপেক্ষমাণ কার্যক্রম নেই।" %}
+          </p>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- SECTION B: RECENTLY DONE -->
+    <div class="card" style="display: flex; flex-direction: column;">
+      <div class="card-header">
+        <h3 class="card-title">
+          🕒 {% tr "Recently Done" "সাম্প্রতিক কার্যক্রম" %}
+        </h3>
+        <span class="badge badge-accepted">{{ ctx.recently_done|length }}</span>
+      </div>
+
+      {% if ctx.recently_done %}
+        <div class="table-container" style="flex: 1;">
+          <table class="table" style="font-size: 0.85rem;">
+            <thead>
+              <tr>
+                <th style="width: 25%;">{% tr "Time" "সময়" %}</th>
+                <th>{% tr "Action & Record" "কার্যক্রম ও রেকর্ড" %}</th>
+                <th style="width: 25%;">{% tr "Actor" "সম্পাদনকারী" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for ev in ctx.recently_done %}
+                <tr>
+                  <td style="color: var(--text-muted); white-space: nowrap;">
+                    {{ ev.created_at|date:"d M, h:i A" }}
+                  </td>
+                  <td>
+                    <strong>{{ ev.action }}</strong>
+                    {% if ev.case %}
+                      — <code style="color: var(--primary-color);">{{ ev.case.case_id }}</code>
+                    {% elif ev.application %}
+                      — <code style="color: var(--secondary-color);">{{ ev.application.application_id }}</code>
+                    {% endif %}
+                    <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.15rem;">
+                      {{ ev.description|truncatewords:10 }}
+                    </div>
+                  </td>
+                  <td>
+                    <span class="badge badge-draft" style="font-size: 0.72rem;">
+                      {{ ev.actor_role }}
+                    </span>
+                    <br>
+                    <small style="color: var(--text-muted);">
+                      {{ ev.actor.username|default:"System" }}
+                    </small>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="empty-state" style="padding: 2.5rem 1rem;">
+          <div class="empty-state-icon">📋</div>
+          <h3>{% tr "No Recent Events" "কোনো সাম্প্রতিক কার্যক্রম নেই" %}</h3>
+          <p style="font-size: 0.85rem; color: var(--text-muted);">
+            {% tr "Recent audit activity for this role will appear here as case actions are recorded." "মামলা বা আবেদনের কার্যক্রম সম্পন্ন হলে এখানে সাম্প্রতিক অডিট লগ প্রদর্শিত হবে।" %}
+          </p>
+        </div>
+      {% endif %}
+    </div>
+
+  </div>
+</div>

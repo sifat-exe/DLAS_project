@@ -15,6 +15,7 @@ from cases.services import (
     submit_application,
     accept_application,
     reject_application,
+    verify_application_nid,
     change_case_priority,
     assign_lawyer_to_case,
     create_case_referral,
@@ -133,6 +134,7 @@ def application_create(request):
                     safe_contact_number=cleaned.get('safe_contact_number', ''),
                     safe_contact_time=cleaned.get('safe_contact_time', ''),
                     language=cleaned.get('language', 'bn'),
+                    nid_number=cleaned.get('nid_number', ''),
                     actor=request.user,
                     provenance=CaseEvent.PROVENANCE_APPLICANT_CONFIRMED
                 )
@@ -190,10 +192,10 @@ def application_detail(request, application_id):
 
     case_record = getattr(application, 'case_record', None)
 
-    # Citizen document upload
-    if request.method == 'POST' and case_record:
+    # Citizen document upload or optional NID simulation
+    if request.method == 'POST':
         action = request.POST.get('action')
-        if action == 'upload_document':
+        if action == 'upload_document' and case_record:
             title = request.POST.get('title', '').strip()
             description = request.POST.get('description', '').strip()
             file_obj = request.FILES.get('file')
@@ -215,6 +217,24 @@ def application_detail(request, application_id):
                 except (ValidationError, PermissionDenied) as e:
                     messages.error(request, str(e))
 
+            return redirect('cases:application_detail', application_id=application_id)
+
+        elif action == 'verify_nid':
+            nid_input = request.POST.get('nid_number', '').strip()
+            try:
+                res = verify_application_nid(application, nid_input, request.user)
+                if res['is_verified']:
+                    messages.success(
+                        request,
+                        f"[ SIMULATED ] NID Verification Successful. Token: {res['verification_token']} (Masked: {res['nid_masked']}) / এনআইডি যাচাই সফল (সিমুলেটেড)"
+                    )
+                else:
+                    messages.warning(
+                        request,
+                        f"[ SIMULATED ] NID Verification: {res['message_en']} / {res['message_bn']}"
+                    )
+            except PermissionDenied as e:
+                messages.error(request, str(e))
             return redirect('cases:application_detail', application_id=application_id)
 
     events = CaseEvent.objects.filter(application=application).order_by('created_at')
@@ -315,6 +335,7 @@ def udc_intake(request):
                     safe_contact_number=cleaned.get('safe_contact_number', ''),
                     safe_contact_time=cleaned.get('safe_contact_time', ''),
                     language=cleaned.get('language', 'bn'),
+                    nid_number=cleaned.get('nid_number', ''),
                     actor=request.user,
                     provenance=CaseEvent.PROVENANCE_INTERMEDIARY_TRANSLATED
                 )
@@ -408,6 +429,24 @@ def officer_application_detail(request, application_id):
                     return redirect('dashboard:officer')
                 except (ValidationError, PermissionDenied) as e:
                     messages.error(request, str(e))
+
+        elif action == 'verify_nid':
+            nid_input = request.POST.get('nid_number', '').strip()
+            try:
+                res = verify_application_nid(application, nid_input, request.user)
+                if res['is_verified']:
+                    messages.success(
+                        request,
+                        f"[ SIMULATED ] NID Verification Successful. Token: {res['verification_token']} (Masked: {res['nid_masked']}) / এনআইডি যাচাই সফল (সিমুলেটেড)"
+                    )
+                else:
+                    messages.warning(
+                        request,
+                        f"[ SIMULATED ] NID Verification Failed: {res['message_en']} / {res['message_bn']}"
+                    )
+            except PermissionDenied as e:
+                messages.error(request, str(e))
+            return redirect('cases:officer_application_detail', application_id=application_id)
 
     return render(request, 'cases/officer_application_detail.html', {
         'application': application,
@@ -575,7 +614,7 @@ def officer_case_detail(request, case_id):
 
         elif action == 'verify_nid':
             nid_input = request.POST.get('nid_number', '').strip()
-            res = MockNIDService.verify_nid(nid_input, name=case_record.application.name)
+            res = verify_application_nid(case_record.application, nid_input, request.user)
             if res['is_verified']:
                 messages.success(
                     request,

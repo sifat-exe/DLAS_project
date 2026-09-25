@@ -92,6 +92,46 @@
             <th>{% tr "Language Preference" "ভাষার অগ্রাধিকার" %}</th>
             <td>{{ application.language|upper }}</td>
           </tr>
+          <tr>
+            <th>{% tr "National ID (NID)" "জাতীয় পরিচয়পত্র" %}</th>
+            <td>
+              {% if application.nid_number %}
+                <code>{{ application.nid_number }}</code>
+              {% else %}
+                <span style="color: var(--text-muted);">{% tr "Not provided (Optional)" "প্রদান করা হয়নি (ঐচ্ছিক)" %}</span>
+              {% endif %}
+              <div style="margin-top: 0.35rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                {% if application.nid_verification_status == 'verified' %}
+                  <span class="badge badge-accepted">✓ {% tr "Verified" "যাচাইকৃত" %}</span>
+                {% elif application.nid_verification_status == 'verification_failed' %}
+                  <span class="badge" style="background: #fee2e2; color: #991b1b;">✕ {% tr "Verification failed" "যাচাই ব্যর্থ" %}</span>
+                {% elif application.nid_verification_status == 'verification_pending' %}
+                  <span class="badge badge-under-review">⏳ {% tr "Verification pending" "যাচাই প্রক্রিয়াধীন" %}</span>
+                {% else %}
+                  <span class="badge badge-draft">{% tr "Not verified" "যাচাই করা হয়নি" %}</span>
+                {% endif %}
+                <span class="form-hint" style="color: var(--text-muted); font-size: 0.8rem;">
+                  {% tr "(Not verified does not affect eligibility or cause rejection)" "(যাচাই না করা হলেও তা আবেদন বাতিল বা অযোগ্যতা বোঝায় না)" %}
+                </span>
+              </div>
+
+              {% if application.status != 'ACCEPTED' and application.status != 'REJECTED' %}
+                <div style="margin-top: 0.75rem; padding-top: 0.5rem; border-top: 1px dashed var(--border-color);">
+                  <form method="POST" action="{% url 'cases:officer_application_detail' application.application_id %}" style="display: flex; gap: 0.5rem; align-items: center; max-width: 450px;">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="verify_nid">
+                    <input type="text" name="nid_number" value="{{ application.nid_number|default:'19851234567890123' }}" class="form-input" style="font-size: 0.85rem; padding: 0.35rem 0.5rem;" placeholder="{% tr "Enter 10 or 17 digit NID" "১০ বা ১৭ ডিজিট এনআইডি" %}" required>
+                    <button type="submit" class="btn btn-secondary btn-sm" style="white-space: nowrap;">
+                      🔍 {% tr "Simulate NID Check" "এনআইডি যাচাই করুন" %}
+                    </button>
+                  </form>
+                  <span class="form-hint" style="font-size: 0.75rem;">
+                    {% tr "Mock verification only. Verification is optional and not mandatory for acceptance." "শুধুমাত্র মক যাচাই। মামলা গ্রহণের জন্য এনআইডি যাচাই বাধ্যতামূলক নয়।" %}
+                  </span>
+                </div>
+              {% endif %}
+            </td>
+          </tr>
         </tbody>
       </table>
     </div>

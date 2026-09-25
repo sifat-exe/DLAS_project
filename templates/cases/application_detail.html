@@ -105,6 +105,30 @@
             <th>{% tr "Intake Channel" "আবেদন মাধ্যম" %}</th>
             <td>{{ application.get_preferred_channel_display }}</td>
           </tr>
+          <tr>
+            <th>{% tr "NID Verification" "জাতীয় পরিচয়পত্র যাচাইকরণ" %}</th>
+            <td>
+              {% if application.nid_number %}
+                <code>{{ application.nid_number }}</code>
+              {% else %}
+                <span style="color: var(--text-muted);">{% tr "Not provided (Optional)" "প্রদান করা হয়নি (ঐচ্ছিক)" %}</span>
+              {% endif %}
+              <div style="margin-top: 0.35rem;">
+                {% if application.nid_verification_status == 'verified' %}
+                  <span class="badge badge-accepted">✓ {% tr "Verified" "যাচাইকৃত" %}</span>
+                {% elif application.nid_verification_status == 'verification_failed' %}
+                  <span class="badge" style="background: #fee2e2; color: #991b1b;">✕ {% tr "Verification failed" "যাচাই ব্যর্থ" %}</span>
+                {% elif application.nid_verification_status == 'verification_pending' %}
+                  <span class="badge badge-under-review">⏳ {% tr "Verification pending" "যাচাই প্রক্রিয়াধীন" %}</span>
+                {% else %}
+                  <span class="badge badge-draft">{% tr "Not verified" "যাচাই করা হয়নি" %}</span>
+                {% endif %}
+                <span class="form-hint" style="color: var(--text-muted); display: block; margin-top: 0.25rem;">
+                  ℹ️ {% tr "NID verification is strictly optional. 'Not verified' does not mean fraudulent, fake, or rejected." "এনআইডি যাচাইকরণ সম্পূর্ণ ঐচ্ছিক। 'যাচাই করা হয়নি' অর্থ আবেদন বাতিল, জাল বা অযোগ্য নয়।" %}
+                </span>
+              </div>
+            </td>
+          </tr>
         </tbody>
       </table>
     </div>

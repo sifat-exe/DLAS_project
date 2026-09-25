@@ -5,6 +5,7 @@ from cases.models import Application, CaseRecord, Task
 from lawyers.models import LawyerAssignment
 from referrals.models import Referral
 from mediation.models import Mediation
+from dashboard.services import get_role_workspace_context, get_case_record_priority_rank
 
 def index(request):
     """
@@ -37,11 +38,26 @@ def officer_dashboard(request):
     """
     DLAO Officer Dashboard with 6 PRD queue categories:
     New, Pending, Accepted, In Progress, Overdue, Closed.
+    Enforces server-side priority ordering:
+    1. URGENT first
+    2. Then other priority levels (HIGH > MEDIUM > LOW)
+    3. Then date-wise ordering (older cases appear first FIFO within same priority)
     """
-    new_apps = Application.objects.filter(status=Application.STATUS_SUBMITTED).order_by('-created_at')
-    pending_apps = Application.objects.filter(status=Application.STATUS_UNDER_REVIEW).order_by('-created_at')
-    accepted_cases = CaseRecord.objects.filter(status=CaseRecord.STATUS_ACCEPTED).order_by('-created_at')
-    in_progress_cases = CaseRecord.objects.filter(status__in=[CaseRecord.STATUS_IN_PROGRESS, CaseRecord.STATUS_REFERRED, CaseRecord.STATUS_MEDIATION]).order_by('-created_at')
+    new_apps = Application.objects.filter(status=Application.STATUS_SUBMITTED).order_by('created_at')
+    pending_apps = Application.objects.filter(status=Application.STATUS_UNDER_REVIEW).order_by('created_at')
+
+    rank_expr = get_case_record_priority_rank()
+
+    accepted_cases = (
+        CaseRecord.objects.filter(status=CaseRecord.STATUS_ACCEPTED)
+        .annotate(priority_rank=rank_expr)
+        .order_by('priority_rank', 'created_at')
+    )
+    in_progress_cases = (
+        CaseRecord.objects.filter(status__in=[CaseRecord.STATUS_IN_PROGRESS, CaseRecord.STATUS_REFERRED, CaseRecord.STATUS_MEDIATION])
+        .annotate(priority_rank=rank_expr)
+        .order_by('priority_rank', 'created_at')
+    )
     
     now = timezone.now()
     overdue_referrals = Referral.objects.filter(deadline__lt=now, status=Referral.STATUS_PENDING) | Referral.objects.filter(status=Referral.STATUS_ESCALATED)
@@ -50,7 +66,10 @@ def officer_dashboard(request):
     closed_cases = CaseRecord.objects.filter(status=CaseRecord.STATUS_CLOSED).order_by('-closed_at')
     rejected_apps = Application.objects.filter(status=Application.STATUS_REJECTED).order_by('-updated_at')
 
+    workspace_context = get_role_workspace_context(request.user, 'dlao_officer')
+
     return render(request, 'dashboard/officer.html', {
+        'workspace_context': workspace_context,
         'new_apps': new_apps,
         'new_count': new_apps.count(),
         'pending_apps': pending_apps,
@@ -68,7 +87,10 @@ def officer_dashboard(request):
     })
 
 def support_staff_dashboard(request):
-    return render(request, 'dashboard/support_staff.html')
+    workspace_context = get_role_workspace_context(request.user, 'support_staff')
+    return render(request, 'dashboard/support_staff.html', {
+        'workspace_context': workspace_context,
+    })
 
 def udc_operator_dashboard(request):
     return render(request, 'dashboard/udc_operator.html')
@@ -88,7 +110,10 @@ def panel_lawyer_dashboard(request):
         declined_assignments = LawyerAssignment.objects.filter(lawyer=request.user, status=LawyerAssignment.STATUS_DECLINED).order_by('-assigned_at')
         active_cases = CaseRecord.objects.filter(assigned_lawyer=request.user).exclude(status=CaseRecord.STATUS_CLOSED).order_by('-updated_at')
 
+    workspace_context = get_role_workspace_context(request.user, 'panel_lawyer')
+
     return render(request, 'dashboard/panel_lawyer.html', {
+        'workspace_context': workspace_context,
         'pending_assignments': pending_assignments,
         'pending_count': len(pending_assignments),
         'accepted_assignments': accepted_assignments,
@@ -112,7 +137,10 @@ def mediator_dashboard(request):
     resolved = [m for m in mediations if m.status == 'agreed']
     failed = [m for m in mediations if m.status in ['failed', 'closed']]
 
+    workspace_context = get_role_workspace_context(request.user, 'mediator')
+
     return render(request, 'dashboard/mediator.html', {
+        'workspace_context': workspace_context,
         'mediations': mediations,
         'scheduled_count': len(scheduled),
         'in_progress_count': len(in_progress),
@@ -121,7 +149,10 @@ def mediator_dashboard(request):
     })
 
 def helpline_agent_dashboard(request):
-    return render(request, 'dashboard/helpline_agent.html')
+    workspace_context = get_role_workspace_context(request.user, 'helpline_agent')
+    return render(request, 'dashboard/helpline_agent.html', {
+        'workspace_context': workspace_context,
+    })
 
 def representative_dashboard(request):
     return render(request, 'dashboard/representative.html')

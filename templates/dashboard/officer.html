@@ -18,6 +18,9 @@
   </div>
 </div>
 
+<!-- What To Do Next / Workspace Action Center (Batch 1 Features 3, 4, 5, 7) -->
+{% include 'dashboard/components/workspace_action_center.html' with ctx=workspace_context %}
+
 <!-- Queue Categories (PRD Section 2.4 / 17) -->
 <div class="grid-3" style="margin-bottom: 1.5rem;">
   <div class="card" style="border-top: 3px solid var(--info-color);">
@@ -151,7 +154,25 @@
               <td><strong style="color: var(--primary-color);">{{ case.case_id }}</strong></td>
               <td>{{ case.application.application_id }}</td>
               <td>{{ case.application.name }}</td>
-              <td><span class="badge badge-under-review">{{ case.get_priority_display }}</span></td>
+              <td>
+                {% if case.priority == 'URGENT' %}
+                  <span class="badge" style="background: #fee2e2; color: #991b1b; font-weight: 700; border: 1px solid #f87171;">
+                    🚨 {% tr "URGENT" "জরুরি" %}
+                  </span>
+                {% elif case.priority == 'HIGH' %}
+                  <span class="badge" style="background: #ffedd5; color: #9a3412; font-weight: 600; border: 1px solid #fdba74;">
+                    ⚡ {% tr "HIGH" "উচ্চ" %}
+                  </span>
+                {% elif case.priority == 'MEDIUM' %}
+                  <span class="badge" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd;">
+                    {% tr "Medium" "সাধারণ" %}
+                  </span>
+                {% else %}
+                  <span class="badge" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1;">
+                    {% tr "Low" "নিম্ন" %}
+                  </span>
+                {% endif %}
+              </td>
               <td><span class="badge badge-accepted">{{ case.get_status_display }}</span></td>
               <td>
                 {% if case.assigned_lawyer %}
@@ -173,7 +194,25 @@
               <td><strong style="color: var(--primary-color);">{{ case.case_id }}</strong></td>
               <td>{{ case.application.application_id }}</td>
               <td>{{ case.application.name }}</td>
-              <td><span class="badge badge-under-review">{{ case.get_priority_display }}</span></td>
+              <td>
+                {% if case.priority == 'URGENT' %}
+                  <span class="badge" style="background: #fee2e2; color: #991b1b; font-weight: 700; border: 1px solid #f87171;">
+                    🚨 {% tr "URGENT" "জরুরি" %}
+                  </span>
+                {% elif case.priority == 'HIGH' %}
+                  <span class="badge" style="background: #ffedd5; color: #9a3412; font-weight: 600; border: 1px solid #fdba74;">
+                    ⚡ {% tr "HIGH" "উচ্চ" %}
+                  </span>
+                {% elif case.priority == 'MEDIUM' %}
+                  <span class="badge" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd;">
+                    {% tr "Medium" "সাধারণ" %}
+                  </span>
+                {% else %}
+                  <span class="badge" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1;">
+                    {% tr "Low" "নিম্ন" %}
+                  </span>
+                {% endif %}
+              </td>
               <td><span class="badge badge-in-progress">{{ case.get_status_display }}</span></td>
               <td>
                 {% if case.assigned_lawyer %}

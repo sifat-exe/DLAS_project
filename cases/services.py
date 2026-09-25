@@ -50,12 +50,15 @@ def submit_application(
     safe_contact_number="",
     safe_contact_time="",
     language="en",
+    nid_number="",
+    nid_verification_status=Application.NID_STATUS_NOT_VERIFIED,
     actor=None,
     provenance=CaseEvent.PROVENANCE_APPLICANT_CONFIRMED
 ):
     """
     Service to submit a legal aid application.
     Enforces that Application ID is created, CaseEvent is logged, and NO Case ID is generated.
+    NID verification is strictly optional: an unverified NID never blocks application creation.
     """
     app_id = generate_application_id()
     
@@ -71,6 +74,8 @@ def submit_application(
         safe_contact_number=safe_contact_number,
         safe_contact_time=safe_contact_time,
         language=language,
+        nid_number=nid_number or "",
+        nid_verification_status=nid_verification_status or Application.NID_STATUS_NOT_VERIFIED,
         status=Application.STATUS_SUBMITTED,
     )
 
@@ -84,11 +89,74 @@ def submit_application(
         actor_role=actor_role,
         channel=preferred_channel,
         action='APPLICATION_SUBMITTED',
-        description=f"Application {app_id} submitted via {preferred_channel}.",
+        description=f"Application {app_id} submitted via {preferred_channel} (NID status: {application.get_nid_verification_status_display()}).",
         provenance=provenance,
     )
 
     return application
+
+def verify_application_nid(application, nid_number, user, channel='web'):
+    """
+    Simulated NID verification for an application.
+    NID verification is strictly optional.
+    Can be run by DLAO officer, admin, or the applicant themselves.
+    Updates application.nid_number and application.nid_verification_status.
+    Logs an append-only CaseEvent.
+    """
+    from core.mock_services import MockNIDService
+    
+    # Server-side authorization check (prevent IDOR)
+    is_officer_or_admin = has_role(user, [UserProfile.ROLE_DLAO_OFFICER, UserProfile.ROLE_ADMIN])
+    is_applicant = (application.applicant_user and application.applicant_user == user)
+    
+    if not (is_officer_or_admin or is_applicant):
+        raise PermissionDenied("You are not authorized to verify NID for this application.")
+
+    nid_str = str(nid_number or '').strip()
+    sim_res = MockNIDService.verify_nid(nid_str, name=application.name)
+
+    actor_role = get_user_role(user) or 'citizen'
+
+    if sim_res['is_verified']:
+        application.nid_number = nid_str
+        application.nid_verification_status = Application.NID_STATUS_VERIFIED
+        application.save(update_fields=['nid_number', 'nid_verification_status', 'updated_at'])
+        
+        case_rec = getattr(application, 'case_record', None)
+        CaseEvent.objects.create(
+            application=application,
+            case=case_rec,
+            actor=user,
+            actor_role=actor_role,
+            channel=channel,
+            action='NID_VERIFIED',
+            description=(
+                f"[ SIMULATED ] NID verified successfully. Token: {sim_res['verification_token']} "
+                f"(Masked: {sim_res['nid_masked']}). NID verification is assistive/optional."
+            ),
+            provenance=CaseEvent.PROVENANCE_STAFF_ENTERED if is_officer_or_admin else CaseEvent.PROVENANCE_APPLICANT_CONFIRMED,
+        )
+    else:
+        application.nid_number = nid_str
+        application.nid_verification_status = Application.NID_STATUS_FAILED
+        application.save(update_fields=['nid_number', 'nid_verification_status', 'updated_at'])
+        
+        case_rec = getattr(application, 'case_record', None)
+        CaseEvent.objects.create(
+            application=application,
+            case=case_rec,
+            actor=user,
+            actor_role=actor_role,
+            channel=channel,
+            action='NID_VERIFICATION_FAILED',
+            description=(
+                f"[ SIMULATED ] NID verification failed: {sim_res['message_en']} "
+                f"Note: Unverified status does NOT cause application rejection."
+            ),
+            provenance=CaseEvent.PROVENANCE_STAFF_ENTERED if is_officer_or_admin else CaseEvent.PROVENANCE_APPLICANT_CONFIRMED,
+        )
+
+    return sim_res
 
 @transaction.atomic
 def accept_application(application, officer, priority=CaseRecord.PRIORITY_MEDIUM, channel='web'):
