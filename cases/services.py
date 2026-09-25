@@ -53,13 +53,24 @@ def submit_application(
     nid_number="",
     nid_verification_status=Application.NID_STATUS_NOT_VERIFIED,
     actor=None,
-    provenance=CaseEvent.PROVENANCE_APPLICANT_CONFIRMED
+    provenance=CaseEvent.PROVENANCE_APPLICANT_CONFIRMED,
+    original_statement="",
+    translated_statement="",
+    statement_language="",
+    idempotency_token=""
 ):
     """
     Service to submit a legal aid application.
     Enforces that Application ID is created, CaseEvent is logged, and NO Case ID is generated.
     NID verification is strictly optional: an unverified NID never blocks application creation.
+    Supports idempotency token for offline sync duplicate protection.
     """
+    # Idempotency duplicate protection (Batch 3 Part B)
+    if idempotency_token:
+        existing = Application.objects.filter(idempotency_token=idempotency_token).first()
+        if existing:
+            return existing
+
     app_id = generate_application_id()
     
     application = Application.objects.create(
@@ -76,6 +87,10 @@ def submit_application(
         language=language,
         nid_number=nid_number or "",
         nid_verification_status=nid_verification_status or Application.NID_STATUS_NOT_VERIFIED,
+        original_statement=original_statement or "",
+        translated_statement=translated_statement or "",
+        statement_language=statement_language or "",
+        idempotency_token=idempotency_token or "",
         status=Application.STATUS_SUBMITTED,
     )
 
@@ -892,4 +907,341 @@ def review_duplicate_candidate(candidate, staff_user, review_status, review_note
     )
 
     return candidate
+
+
+# =============================================================================
+# BATCH 3 — PART A: MARMA PROVENANCE WORKFLOW SERVICE
+# =============================================================================
+
+@transaction.atomic
+def submit_marma_intake(
+    name,
+    phone,
+    address,
+    original_statement,
+    translated_statement,
+    typed_legal_problem,
+    typed_incident_description,
+    statement_language="marma",
+    actor=None,
+    applicant_user=None,
+    preferred_channel=Application.CHANNEL_UDC,
+    safe_contact_number="",
+    safe_contact_time="",
+    nid_number="",
+    idempotency_token=""
+):
+    """
+    Assisted Marma Indigenous Language Intake Workflow (Batch 3 Part A).
+    Preserves the distinct provenance chain:
+      MARMA SAID -> TRANSLATED -> TYPED -> APPLICATION DATA
+    Records explicit sequential append-only CaseEvents:
+      1. marma_statement_recorded (provenance=applicant_confirmed)
+      2. marma_translation_recorded (provenance=intermediary_translated)
+      3. marma_typed_confirmation (provenance=staff_entered)
+      4. application_submitted (provenance=intermediary_translated)
+    Enforces Application ID created, NO Case ID generated before DLAO acceptance.
+    """
+    app = submit_application(
+        name=name,
+        phone=phone,
+        address=address,
+        legal_problem=typed_legal_problem,
+        incident_description=typed_incident_description,
+        applicant_user=applicant_user,
+        preferred_channel=preferred_channel,
+        safe_contact_number=safe_contact_number,
+        safe_contact_time=safe_contact_time,
+        language="bn",
+        nid_number=nid_number,
+        actor=actor,
+        provenance=CaseEvent.PROVENANCE_INTERMEDIARY_TRANSLATED,
+        original_statement=original_statement,
+        translated_statement=translated_statement,
+        statement_language=statement_language or "marma",
+        idempotency_token=idempotency_token
+    )
+    
+    actor_user = actor or applicant_user
+    actor_role = get_user_role(actor_user) or 'udc_operator'
+    
+    # 1. marma_statement_recorded (Original statement said by Marma applicant)
+    CaseEvent.objects.create(
+        application=app,
+        case=None,
+        actor=actor_user,
+        actor_role=actor_role,
+        channel=preferred_channel,
+        action='marma_statement_recorded',
+        description=f"Original oral statement recorded in {statement_language.title()}: '{original_statement}'. Attributed directly to applicant.",
+        provenance=CaseEvent.PROVENANCE_APPLICANT_CONFIRMED
+    )
+    
+    # 2. marma_translation_recorded (Translation by intermediary/translator)
+    CaseEvent.objects.create(
+        application=app,
+        case=None,
+        actor=actor_user,
+        actor_role=actor_role,
+        channel=preferred_channel,
+        action='marma_translation_recorded',
+        description=f"Intermediary translation into Bangla/English recorded: '{translated_statement}'. Attributed to translator/operator, not falsely labeled as applicant-originated.",
+        provenance=CaseEvent.PROVENANCE_INTERMEDIARY_TRANSLATED
+    )
+    
+    # 3. marma_typed_confirmation (Confirmation that typed structured data represents translation)
+    CaseEvent.objects.create(
+        application=app,
+        case=None,
+        actor=actor_user,
+        actor_role=actor_role,
+        channel=preferred_channel,
+        action='marma_typed_confirmation',
+        description=f"Assisting operator verified that structured legal problem ('{typed_legal_problem}') and incident details accurately represent the translation. Applicant confirmed.",
+        provenance=CaseEvent.PROVENANCE_STAFF_ENTERED
+    )
+    
+    return app
+
+
+# =============================================================================
+# BATCH 3 — PART B & C: TRUE OFFLINE SYNC & CONFLICT RESOLUTION SERVICES
+# =============================================================================
+
+@transaction.atomic
+def process_offline_sync(
+    item_data,
+    user,
+    channel=Application.CHANNEL_UDC,
+    simulate_conflict=False
+):
+    """
+    Processes a queued offline intake item during reconnection sync.
+    Enforces:
+    - Idempotency via idempotency_token / temp_id: duplicate sync attempts return existing Application.
+    - Full server-side validation.
+    - Conflict detection: detects if conflicting submission exists without silent overwrites.
+    - CaseEvent logging for sync audit.
+    - Application ID returned, NO Case ID created before DLAO acceptance.
+    """
+    temp_id = item_data.get('temp_id', '')
+    idempotency_token = item_data.get('idempotency_token') or f"OFFLINE-SYNC-{temp_id}"
+    
+    # Idempotency check: exactly one Application will exist if retried
+    existing_app = Application.objects.filter(idempotency_token=idempotency_token).first()
+    if existing_app:
+        return {
+            'status': 'synced',
+            'application_id': existing_app.application_id,
+            'temp_id': temp_id,
+            'is_duplicate_retry': True,
+            'message': 'Item previously synchronized (idempotent submission preserved).'
+        }
+    
+    # Server-side field validation
+    name = (item_data.get('name') or '').strip()
+    phone = (item_data.get('phone') or '').strip()
+    address = (item_data.get('address') or '').strip()
+    legal_problem = (item_data.get('legal_problem') or '').strip()
+    incident_description = (item_data.get('incident_description') or '').strip()
+    
+    if not (name and phone and address and legal_problem and incident_description):
+        return {
+            'status': 'failed',
+            'temp_id': temp_id,
+            'error': 'Missing mandatory fields: Name, Phone, Address, Legal Problem, and Incident Description are required.'
+        }
+    
+    # Conflict Detection:
+    # A conflict occurs if simulate_conflict is True, or if another Application with same phone
+    # already exists on server with conflicting legal problem or name.
+    matching_conflict_app = None
+    if simulate_conflict:
+        matching_conflict_app = Application.objects.filter(phone=phone).first() or Application.objects.first()
+    else:
+        # Real conflict check: same phone exists on server but with different applicant name or different incident
+        potential = Application.objects.filter(phone=phone).exclude(name__iexact=name).first()
+        if potential:
+            matching_conflict_app = potential
+            
+    if matching_conflict_app:
+        return {
+            'status': 'conflict',
+            'temp_id': temp_id,
+            'conflict_reason': f"Matching phone number '{phone}' already registered on server with differing applicant details ({matching_conflict_app.name}). Human review required.",
+            'local_version': {
+                'name': name,
+                'phone': phone,
+                'address': address,
+                'legal_problem': legal_problem,
+                'incident_description': incident_description,
+                'channel': item_data.get('preferred_channel', channel),
+            },
+            'server_version': {
+                'application_id': matching_conflict_app.application_id,
+                'name': matching_conflict_app.name,
+                'phone': matching_conflict_app.phone,
+                'address': matching_conflict_app.address,
+                'legal_problem': matching_conflict_app.legal_problem,
+                'incident_description': matching_conflict_app.incident_description,
+                'status': matching_conflict_app.status,
+            }
+        }
+    
+    # If Marma fields present, use submit_marma_intake, else standard submit_application
+    orig_stmt = item_data.get('original_statement', '')
+    trans_stmt = item_data.get('translated_statement', '')
+    stmt_lang = item_data.get('statement_language', '')
+    
+    if orig_stmt and trans_stmt:
+        app = submit_marma_intake(
+            name=name,
+            phone=phone,
+            address=address,
+            original_statement=orig_stmt,
+            translated_statement=trans_stmt,
+            typed_legal_problem=legal_problem,
+            typed_incident_description=incident_description,
+            statement_language=stmt_lang or "marma",
+            actor=user,
+            applicant_user=user if has_role(user, [UserProfile.ROLE_CITIZEN]) else None,
+            preferred_channel=item_data.get('preferred_channel') or channel,
+            safe_contact_number=item_data.get('safe_contact_number', ''),
+            safe_contact_time=item_data.get('safe_contact_time', ''),
+            nid_number=item_data.get('nid_number', ''),
+            idempotency_token=idempotency_token
+        )
+    else:
+        app = submit_application(
+            name=name,
+            phone=phone,
+            address=address,
+            legal_problem=legal_problem,
+            incident_description=incident_description,
+            applicant_user=user if has_role(user, [UserProfile.ROLE_CITIZEN]) else None,
+            preferred_channel=item_data.get('preferred_channel') or channel,
+            safe_contact_number=item_data.get('safe_contact_number', ''),
+            safe_contact_time=item_data.get('safe_contact_time', ''),
+            language=item_data.get('language', 'bn'),
+            nid_number=item_data.get('nid_number', ''),
+            actor=user,
+            provenance=CaseEvent.PROVENANCE_INTERMEDIARY_TRANSLATED if has_role(user, [UserProfile.ROLE_UDC_OPERATOR]) else CaseEvent.PROVENANCE_APPLICANT_CONFIRMED,
+            idempotency_token=idempotency_token
+        )
+    
+    # Log CaseEvent for offline synchronization
+    actor_role = get_user_role(user) or 'udc_operator'
+    CaseEvent.objects.create(
+        application=app,
+        case=None,
+        actor=user,
+        actor_role=actor_role,
+        channel=app.preferred_channel,
+        action='OFFLINE_SYNC_COMPLETED',
+        description=f"Offline queue item (Local ID: {temp_id}) synchronized successfully to official Application {app.application_id}.",
+        provenance=CaseEvent.PROVENANCE_STAFF_ENTERED if has_role(user, [UserProfile.ROLE_UDC_OPERATOR, UserProfile.ROLE_DLAO_SUPPORT_STAFF, UserProfile.ROLE_DLAO_OFFICER]) else CaseEvent.PROVENANCE_APPLICANT_CONFIRMED
+    )
+    
+    return {
+        'status': 'synced',
+        'application_id': app.application_id,
+        'temp_id': temp_id,
+        'is_duplicate_retry': False,
+        'message': 'Synchronized successfully.'
+    }
+
+@transaction.atomic
+def resolve_offline_conflict(
+    temp_id,
+    resolution_choice,
+    user,
+    server_app_id=None,
+    local_data=None,
+    edited_data=None
+):
+    """
+    Human-controlled conflict resolution (Batch 3 Part C).
+    Enforces NO SILENT OVERWRITE:
+    - keep_local: local data accepted as authoritative; creates/updates application with explicit audit.
+    - keep_server: server data accepted as authoritative; local item marked synced to existing server_app_id.
+    - review_edit: human officer/operator reviews and enters corrected data.
+    Logs append-only CaseEvent: OFFLINE_CONFLICT_RESOLVED.
+    """
+    actor_role = get_user_role(user) or 'operator'
+    
+    if resolution_choice == 'keep_server':
+        if not server_app_id:
+            raise ValidationError("Server application ID required for keep_server resolution.")
+        server_app = Application.objects.get(application_id=server_app_id)
+        CaseEvent.objects.create(
+            application=server_app,
+            case=getattr(server_app, 'case_record', None),
+            actor=user,
+            actor_role=actor_role,
+            channel=server_app.preferred_channel,
+            action='OFFLINE_CONFLICT_RESOLVED',
+            description=f"Conflict on local queue item {temp_id} resolved by {user.username}: Selected 'Keep Server Version'.",
+            provenance=CaseEvent.PROVENANCE_STAFF_ENTERED,
+            authority='Human Operator'
+        )
+        return server_app
+        
+    elif resolution_choice == 'keep_local':
+        if not local_data:
+            raise ValidationError("Local intake data required for keep_local resolution.")
+        app = submit_application(
+            name=local_data['name'],
+            phone=local_data['phone'],
+            address=local_data['address'],
+            legal_problem=local_data['legal_problem'],
+            incident_description=local_data['incident_description'],
+            applicant_user=user if has_role(user, [UserProfile.ROLE_CITIZEN]) else None,
+            preferred_channel=local_data.get('preferred_channel', Application.CHANNEL_UDC),
+            actor=user,
+            provenance=CaseEvent.PROVENANCE_APPLICANT_CONFIRMED,
+            idempotency_token=f"OFFLINE-RESOLVED-LOCAL-{temp_id}"
+        )
+        CaseEvent.objects.create(
+            application=app,
+            case=None,
+            actor=user,
+            actor_role=actor_role,
+            channel=app.preferred_channel,
+            action='OFFLINE_CONFLICT_RESOLVED',
+            description=f"Conflict on local queue item {temp_id} resolved by {user.username}: Selected 'Keep Local Version'. New official application generated.",
+            provenance=CaseEvent.PROVENANCE_STAFF_ENTERED,
+            authority='Human Operator'
+        )
+        return app
+        
+    elif resolution_choice == 'review_edit':
+        data = edited_data or local_data
+        if not data:
+            raise ValidationError("Edited data required for review_edit resolution.")
+        app = submit_application(
+            name=data['name'],
+            phone=data['phone'],
+            address=data['address'],
+            legal_problem=data['legal_problem'],
+            incident_description=data['incident_description'],
+            applicant_user=user if has_role(user, [UserProfile.ROLE_CITIZEN]) else None,
+            preferred_channel=data.get('preferred_channel', Application.CHANNEL_UDC),
+            actor=user,
+            provenance=CaseEvent.PROVENANCE_STAFF_ENTERED,
+            idempotency_token=f"OFFLINE-RESOLVED-EDIT-{temp_id}"
+        )
+        CaseEvent.objects.create(
+            application=app,
+            case=None,
+            actor=user,
+            actor_role=actor_role,
+            channel=app.preferred_channel,
+            action='OFFLINE_CONFLICT_RESOLVED',
+            description=f"Conflict on local queue item {temp_id} resolved by {user.username}: Human reviewed and edited data submitted.",
+            provenance=CaseEvent.PROVENANCE_STAFF_ENTERED,
+            authority='Human Operator'
+        )
+        return app
+    else:
+        raise ValidationError(f"Invalid resolution choice: {resolution_choice}")
 

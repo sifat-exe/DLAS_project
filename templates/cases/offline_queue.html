@@ -1,0 +1,628 @@
+{% extends 'base.html' %}
+{% load dlas_tags %}
+
+{% block title %}
+  {% tr "Simulated Offline Queue & Sync - DLAS" "পরীক্ষামূলক অফলাইন কিউ ও সিঙ্ক - ডিএলএএস" %}
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 1050px; margin: 1.5rem auto;">
+  <div class="dashboard-header">
+    <div>
+      <h2>{% tr "Simulated Offline Queue & Server Synchronization" "পরীক্ষামূলক অফলাইন কিউ ও সার্ভার সিঙ্ক্রোনাইজেশন" %}</h2>
+      <p style="color: var(--text-muted); font-size: 0.92rem;">
+        {% tr "True client-side persistence (localStorage) for low-bandwidth rural operations with idempotent sync & conflict protection." "দুর্বল নেটওয়ার্কযুক্ত অঞ্চলের জন্য অফলাইন আবেদন সংরক্ষণ, নিরাপদ সিঙ্ক ও বিরোধ নিরসন ব্যবস্থাপনা।" %}
+      </p>
+    </div>
+    <div style="display: flex; gap: 0.5rem; align-items: center;">
+      <span id="connStateBadge" class="badge badge-accepted" style="font-size: 0.95rem; padding: 0.4rem 0.8rem;">
+        ● ONLINE / অনলাইন
+      </span>
+    </div>
+  </div>
+
+  <!-- Simulated Offline Queue Architecture Notice -->
+  <div class="card" style="border-left: 4px solid var(--secondary-color); background-color: #f8fafc; margin-bottom: 1.25rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+      <div>
+        <h4 style="color: var(--secondary-color); margin-bottom: 0.25rem;">
+          {% tr "Simulated Offline Mode Controls / পরীক্ষামূলক অফলাইন কন্ট্রোল" "পরীক্ষামূলক অফলাইন কন্ট্রোল" %}
+        </h4>
+        <p style="font-size: 0.86rem; color: var(--text-secondary); margin: 0;">
+          {% tr "When Offline is simulated, submissions never contact Django; they receive a temporary local ID and persist across browser reloads." "অফলাইন মোড সক্রিয় থাকাকালীন ফর্ম জমাদানে কোনো সার্ভার রিকোয়েস্ট যাবে না; লোকাল আইডি বরাদ্দ হবে এবং রিলোড করলেও তথ্য অক্ষত থাকবে।" %}
+        </p>
+      </div>
+
+      <!-- Demo Control Toolbar -->
+      <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+        <button id="toggleOfflineBtn" class="btn btn-secondary btn-sm" onclick="toggleOfflineMode()">
+          🔌 {% tr "Simulate Offline Mode" "অফলাইন মোড সিমুলেট করুন" %}
+        </button>
+        <button id="syncAllBtn" class="btn btn-primary btn-sm" onclick="syncAllQueuedItems()">
+          ⚡ {% tr "Sync Now" "সিঙ্ক করুন" %}
+        </button>
+        <button class="btn btn-secondary btn-sm" onclick="clearSyncedItems()">
+          🧹 {% tr "Clear Synced" "সিঙ্ককৃত তথ্য মুছুন" %}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Queue Status Metric Badges -->
+  <div class="grid-4" style="margin-bottom: 1.25rem;">
+    <div class="card" style="padding: 0.85rem; text-align: center;">
+      <small style="color: var(--text-muted);">{% tr "Local Queued" "অফলাইন অপেক্ষমাণ" %}</small>
+      <div id="metricQueued" style="font-size: 1.6rem; font-weight: 800; color: #b45309;">0</div>
+    </div>
+    <div class="card" style="padding: 0.85rem; text-align: center;">
+      <small style="color: var(--text-muted);">{% tr "Synchronized" "সফলভাবে সিঙ্ককৃত" %}</small>
+      <div id="metricSynced" style="font-size: 1.6rem; font-weight: 800; color: #15803d;">0</div>
+    </div>
+    <div class="card" style="padding: 0.85rem; text-align: center;">
+      <small style="color: var(--text-muted);">{% tr "Conflicts Detected" "চিহ্নিত দ্বন্দ্ব" %}</small>
+      <div id="metricConflict" style="font-size: 1.6rem; font-weight: 800; color: #dc2626;">0</div>
+    </div>
+    <div class="card" style="padding: 0.85rem; text-align: center;">
+      <small style="color: var(--text-muted);">{% tr "Sync Failures" "ব্যর্থ প্রচেষ্টা" %}</small>
+      <div id="metricFailed" style="font-size: 1.6rem; font-weight: 800; color: #6b7280;">0</div>
+    </div>
+  </div>
+
+  <!-- Conflict Resolution Modal / Card (Dynamic when conflict selected) -->
+  <div id="conflictResolutionCard" class="card" style="display: none; border: 2px solid #ef4444; background-color: #fff1f2; margin-bottom: 1.5rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+      <h3 style="color: #991b1b; margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+        <span>⚠️</span> {% tr "Data Conflict Detected — Human Resolution Required" "ডাটা দ্বন্দ্ব সনাক্ত — মানব সিদ্ধান্ত আবশ্যক" %}
+      </h3>
+      <span class="badge badge-emergency">CONFLICT / দ্বন্দ্ব</span>
+    </div>
+
+    <p id="conflictReasonText" style="color: #b91c1c; font-size: 0.9rem; margin-bottom: 1rem; font-weight: 600;">
+      <!-- Reason text injected by JS -->
+    </p>
+
+    <!-- Side by Side Comparison -->
+    <div class="grid-2" style="margin-bottom: 1.25rem;">
+      <!-- Local Version -->
+      <div style="background-color: white; border: 1px solid #fca5a5; border-radius: var(--radius-md); padding: 1rem;">
+        <h4 style="color: #991b1b; margin-bottom: 0.5rem; border-bottom: 1px solid #fee2e2; padding-bottom: 0.4rem;">
+          📱 {% tr "Local Offline Version" "স্থানীয় অফলাইন সংস্করণ" %}
+        </h4>
+        <div id="localVersionDisplay" style="font-size: 0.88rem; color: var(--text-secondary);">
+          <!-- Injected by JS -->
+        </div>
+      </div>
+
+      <!-- Server Version -->
+      <div style="background-color: white; border: 1px solid #cbd5e1; border-radius: var(--radius-md); padding: 1rem;">
+        <h4 style="color: #1e3a8a; margin-bottom: 0.5rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.4rem;">
+          🏛️ {% tr "Existing Server Version" "সার্ভারের বিদ্যমান সংস্করণ" %}
+        </h4>
+        <div id="serverVersionDisplay" style="font-size: 0.88rem; color: var(--text-secondary);">
+          <!-- Injected by JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Human Controlled Actions -->
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; border-top: 1px solid #fecaca; padding-top: 1rem;">
+      <span style="font-size: 0.85rem; color: #991b1b; font-weight: 600;">
+        {% tr "NO SILENT OVERWRITE: Every decision is audited via CaseEvent." "কোনো গোপন ওভাররাইট নয়: প্রতিটি সিদ্ধান্ত কেস-ইভেন্টে সংরক্ষিত হবে।" %}
+      </span>
+      <div style="display: flex; gap: 0.5rem;">
+        <button class="btn btn-secondary btn-sm" onclick="resolveConflict('keep_server')">
+          {% tr "Keep Server Version" "সার্ভার সংস্করণ বহাল রাখুন" %}
+        </button>
+        <button class="btn btn-primary btn-sm" onclick="resolveConflict('keep_local')">
+          {% tr "Keep Local Version" "স্থানীয় সংস্করণ বহাল রাখুন" %}
+        </button>
+        <button class="btn btn-secondary btn-sm" onclick="cancelConflictModal()">
+          {% tr "Dismiss" "বাতিল" %}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Intake Form Card -->
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+      <h3 class="card-title">{% tr "Offline-Capable Intake Form" "অফলাইন আইনি সহায়তা আবেদন ফরম" %}</h3>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="fillSampleIntake()">
+        {% tr "Fill Sample Intake" "নমুনা তথ্য পূরণ করুন" %}
+      </button>
+    </div>
+
+    <form id="offlineIntakeForm" onsubmit="handleIntakeSubmit(event)">
+      {% csrf_token %}
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label" for="inp_name">{% tr "Applicant Name *" "আবেদনকারীর নাম *" %}</label>
+          <input type="text" id="inp_name" class="form-input" placeholder="e.g. মোছাঃ লাইলী বেগম / Laily Begum" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="inp_phone">{% tr "Phone Number *" "ফোন নম্বর *" %}</label>
+          <input type="text" id="inp_phone" class="form-input" placeholder="01XXXXXXXXX" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="inp_address">{% tr "Address *" "ঠিকানা *" %}</label>
+        <textarea id="inp_address" class="form-textarea" rows="2" placeholder="মৌজা, ইউনিয়ন, উপজেলা, জেলা" required></textarea>
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label" for="inp_channel">{% tr "Intake Channel" "আবেদনের চ্যানেল" %}</label>
+          <select id="inp_channel" class="form-select">
+            <option value="udc">Union Digital Centre (UDC)</option>
+            <option value="walk_in">Office Walk-in</option>
+            <option value="web">Web Portal</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="inp_language">{% tr "Language" "ভাষা" %}</label>
+          <select id="inp_language" class="form-select">
+            <option value="bn">বাংলা (Bangla)</option>
+            <option value="en">English</option>
+            <option value="marma">Marma (মারমা)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="inp_problem">{% tr "Legal Problem Summary *" "আইনি সমস্যার সারসংক্ষেপ *" %}</label>
+        <textarea id="inp_problem" class="form-textarea" rows="2" placeholder="আইনি সমস্যার মূল বিষয়টি লিখুন" required></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="inp_incident">{% tr "Incident Description *" "ঘটনার বিস্তারিত বিবরণ *" %}</label>
+        <textarea id="inp_incident" class="form-textarea" rows="3" placeholder="তারিখ, স্থান ও ঘটনার বিবরণ" required></textarea>
+      </div>
+
+      <!-- Demo Conflict Simulation Checkbox -->
+      <div style="background-color: #f8fafc; border: 1px dashed var(--border-color); border-radius: var(--radius-md); padding: 0.75rem 1rem; margin-bottom: 1rem;">
+        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.88rem; color: #991b1b; font-weight: 600;">
+          <input type="checkbox" id="chk_simulate_conflict" class="form-checkbox">
+          {% tr "Simulate Server Conflict on Sync (Hackathon Demo Feature)" "সিঙ্কের সময় ডাটা দ্বন্দ্ব সিমুলেট করুন (হ্যাকথন ডেমো ফিচার)" %}
+        </label>
+        <small style="color: var(--text-muted); display: block; margin-top: 0.25rem;">
+          {% tr "Demonstrates safe conflict detection when server data differs from offline submission." "সার্ভারের সাথে অফলাইন তথ্যের অমিল সনাক্তকরণ ও নিরাপদ নিষ্পত্তি প্রদর্শন করে।" %}
+        </small>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+        <button type="reset" class="btn btn-secondary">
+          {% tr "Clear Form" "ফর্ম খালি করুন" %}
+        </button>
+        <button type="submit" id="submitBtn" class="btn btn-primary">
+          💾 {% tr "Submit / Queue Application" "আবেদন সংরক্ষণ / কিউ করুন" %}
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Local Queue Table Card -->
+  <div class="card">
+    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+      <div>
+        <h3 class="card-title">{% tr "Browser Local Offline Queue" "ব্রাউজারের লোকাল অফলাইন কিউ" %}</h3>
+        <span class="form-hint">
+          {% tr "Persisted in localStorage; survives page reload." "লোকালস্টোরেজে সংরক্ষিত; রিলোড করলেও বিদ্যমান থাকে।" %}
+        </span>
+      </div>
+      <div>
+        <span id="queueCountBadge" class="badge badge-under-review">0 items</span>
+      </div>
+    </div>
+
+    <div class="table-container">
+      <table class="table" id="queueTable">
+        <thead>
+          <tr>
+            <th>{% tr "Temporary Local ID" "অফলাইন লোকাল আইডি" %}</th>
+            <th>{% tr "Applicant" "আবেদনকারী" %}</th>
+            <th>{% tr "Legal Problem" "আইনি বিষয়" %}</th>
+            <th>{% tr "Created" "সংরক্ষণ সময়" %}</th>
+            <th>{% tr "Status" "অবস্থা" %}</th>
+            <th>{% tr "Server Application ID" "সার্ভার আবেদন নম্বর" %}</th>
+            <th>{% tr "Actions" "পদক্ষেপ" %}</th>
+          </tr>
+        </thead>
+        <tbody id="queueTableBody">
+          <!-- Populated by JavaScript -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// Key constants for local persistence
+const STORAGE_QUEUE_KEY = 'dlas_offline_intake_queue';
+const STORAGE_MODE_KEY = 'dlas_simulated_offline_mode';
+let activeConflictItem = null;
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', function() {
+  updateConnectionUI();
+  renderQueueTable();
+});
+
+// Toggle Simulated Offline Mode
+function toggleOfflineMode() {
+  const isOffline = (localStorage.getItem(STORAGE_MODE_KEY) === 'true');
+  const newMode = !isOffline;
+  localStorage.setItem(STORAGE_MODE_KEY, newMode ? 'true' : 'false');
+  updateConnectionUI();
+}
+
+function updateConnectionUI() {
+  const isOffline = (localStorage.getItem(STORAGE_MODE_KEY) === 'true');
+  const badge = document.getElementById('connStateBadge');
+  const toggleBtn = document.getElementById('toggleOfflineBtn');
+  const submitBtn = document.getElementById('submitBtn');
+
+  if (isOffline) {
+    badge.className = 'badge badge-emergency';
+    badge.style.backgroundColor = '#fef3c7';
+    badge.style.color = '#92400e';
+    badge.style.borderColor = '#f59e0b';
+    badge.innerHTML = '● OFFLINE (SIMULATED) / অফলাইন';
+
+    toggleBtn.className = 'btn btn-primary btn-sm';
+    toggleBtn.innerHTML = '📶 {% tr "Simulate Online Mode" "অনলাইন মোড চালু করুন" %}';
+
+    submitBtn.innerHTML = '💾 {% tr "Save to Local Queue (Offline)" "লোকাল কিউ-তে সংরক্ষণ (অফলাইন)" %}';
+  } else {
+    badge.className = 'badge badge-accepted';
+    badge.style.backgroundColor = '#dcfce7';
+    badge.style.color = '#15803d';
+    badge.style.borderColor = '#86efac';
+    badge.innerHTML = '● ONLINE / অনলাইন';
+
+    toggleBtn.className = 'btn btn-secondary btn-sm';
+    toggleBtn.innerHTML = '🔌 {% tr "Simulate Offline Mode" "অফলাইন মোড সিমুলেট করুন" %}';
+
+    submitBtn.innerHTML = '💾 {% tr "Submit / Queue Application" "আবেদন সংরক্ষণ / কিউ করুন" %}';
+  }
+}
+
+// Get queue from localStorage
+function getQueue() {
+  try {
+    const raw = localStorage.getItem(STORAGE_QUEUE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    console.error("Error reading localStorage queue:", e);
+    return [];
+  }
+}
+
+// Save queue to localStorage
+function saveQueue(queue) {
+  localStorage.setItem(STORAGE_QUEUE_KEY, JSON.stringify(queue));
+  renderQueueTable();
+}
+
+// Handle Form Submission
+function handleIntakeSubmit(e) {
+  e.preventDefault();
+  const isOffline = (localStorage.getItem(STORAGE_MODE_KEY) === 'true');
+
+  const name = document.getElementById('inp_name').value.trim();
+  const phone = document.getElementById('inp_phone').value.trim();
+  const address = document.getElementById('inp_address').value.trim();
+  const channel = document.getElementById('inp_channel').value;
+  const language = document.getElementById('inp_language').value;
+  const legal_problem = document.getElementById('inp_problem').value.trim();
+  const incident_description = document.getElementById('inp_incident').value.trim();
+  const simulate_conflict = document.getElementById('chk_simulate_conflict').checked;
+
+  if (!name || !phone || !address || !legal_problem || !incident_description) {
+    alert("Please fill in all mandatory fields / অনুগ্রহ করে সকল বাধ্যতামূলক ঘর পূরণ করুন।");
+    return;
+  }
+
+  // Generate unique temporary local ID
+  const tempId = "OFFLINE-TMP-" + Date.now().toString(36).toUpperCase() + "-" + Math.random().toString(36).substring(2, 6).toUpperCase();
+  const idempotencyToken = "IDEM-" + tempId;
+
+  const item = {
+    temp_id: tempId,
+    idempotency_token: idempotencyToken,
+    created_at: new Date().toISOString(),
+    status: 'QUEUED',
+    data: {
+      name: name,
+      phone: phone,
+      address: address,
+      preferred_channel: channel,
+      language: language,
+      legal_problem: legal_problem,
+      incident_description: incident_description,
+      simulate_conflict: simulate_conflict,
+    },
+    server_app_id: null,
+    sync_attempts: 0,
+    last_sync: null,
+    error: null,
+    conflict_data: null,
+  };
+
+  const queue = getQueue();
+  queue.unshift(item);
+  saveQueue(queue);
+
+  document.getElementById('offlineIntakeForm').reset();
+
+  if (isOffline) {
+    alert("✅ Offline Mode Active: Application saved locally in browser storage.\nTemporary Local ID: " + tempId + "\nZero server requests made. Item is ready to sync when connection is restored.");
+  } else {
+    alert("Saved to local queue with Temporary ID: " + tempId + ". Click 'Sync Now' or 'Sync' on the item to transmit to server.");
+  }
+}
+
+// Render Local Queue Table
+function renderQueueTable() {
+  const queue = getQueue();
+  const tbody = document.getElementById('queueTableBody');
+  const countBadge = document.getElementById('queueCountBadge');
+
+  countBadge.innerText = queue.length + " item" + (queue.length === 1 ? "" : "s");
+
+  // Update metrics
+  let qCount = 0, sCount = 0, cCount = 0, fCount = 0;
+  queue.forEach(it => {
+    if (it.status === 'QUEUED') qCount++;
+    else if (it.status === 'SYNCED') sCount++;
+    else if (it.status === 'CONFLICT') cCount++;
+    else if (it.status === 'FAILED') fCount++;
+  });
+  document.getElementById('metricQueued').innerText = qCount;
+  document.getElementById('metricSynced').innerText = sCount;
+  document.getElementById('metricConflict').innerText = cCount;
+  document.getElementById('metricFailed').innerText = fCount;
+
+  if (queue.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+          📭 {% tr "No offline queued items. Fill the form above while offline to test local queuing." "কোনো অফলাইন অপেক্ষমাণ আবেদন নেই। অফলাইনে টেস্ট করতে উপরের ফর্মটি পূরণ করুন।" %}
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = queue.map((item, idx) => {
+    let statusBadge = '';
+    if (item.status === 'QUEUED') {
+      statusBadge = '<span class="badge badge-under-review">QUEUED / অপেক্ষমাণ</span>';
+    } else if (item.status === 'SYNCING') {
+      statusBadge = '<span class="badge" style="background-color: #e0e7ff; color: #3730a3;">SYNCING... / সিঙ্ক হচ্ছে</span>';
+    } else if (item.status === 'SYNCED') {
+      statusBadge = '<span class="badge badge-accepted">SYNCED / সম্পন্ন</span>';
+    } else if (item.status === 'CONFLICT') {
+      statusBadge = '<span class="badge badge-emergency">CONFLICT / দ্বন্দ্ব</span>';
+    } else {
+      statusBadge = '<span class="badge badge-closed">FAILED / ব্যর্থ</span>';
+    }
+
+    const createdDate = new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    let actionBtns = '';
+    if (item.status === 'QUEUED' || item.status === 'FAILED') {
+      actionBtns += `<button class="btn btn-primary btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.78rem;" onclick="syncSingleItem('${item.temp_id}')">⚡ Sync</button> `;
+    } else if (item.status === 'CONFLICT') {
+      actionBtns += `<button class="btn btn-secondary btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.78rem; background-color: #fee2e2; color: #991b1b;" onclick="openConflictModal('${item.temp_id}')">⚠️ Resolve</button> `;
+    }
+    actionBtns += `<button class="btn btn-secondary btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.78rem;" onclick="deleteQueueItem('${item.temp_id}')">🗑️</button>`;
+
+    let serverCol = item.server_app_id 
+      ? `<a href="/cases/applications/${item.server_app_id}/" style="font-weight: 700; color: var(--primary-color);">${item.server_app_id}</a>`
+      : `<span style="color: var(--text-muted); font-size: 0.82rem;">None (Unsynced)</span>`;
+
+    return `
+      <tr>
+        <td><strong style="color: var(--secondary-color);">${item.temp_id}</strong></td>
+        <td>${item.data.name}<br><small style="color: var(--text-muted);">${item.data.phone}</small></td>
+        <td style="max-width: 220px; font-size: 0.85rem;">${item.data.legal_problem}</td>
+        <td style="font-size: 0.82rem; color: var(--text-muted);">${createdDate}</td>
+        <td>${statusBadge}</td>
+        <td>${serverCol}</td>
+        <td>${actionBtns}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// Sync single queued item
+async function syncSingleItem(tempId) {
+  const isOffline = (localStorage.getItem(STORAGE_MODE_KEY) === 'true');
+  if (isOffline) {
+    alert("⚠️ Cannot synchronize while Offline Mode is simulated!\nPlease click 'Simulate Online Mode' first to restore connection.");
+    return;
+  }
+
+  const queue = getQueue();
+  const item = queue.find(it => it.temp_id === tempId);
+  if (!item) return;
+
+  item.status = 'SYNCING';
+  saveQueue(queue);
+
+  try {
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    const response = await fetch("{% url 'cases:offline_sync' %}", {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrfToken,
+      },
+      body: JSON.stringify({
+        temp_id: item.temp_id,
+        idempotency_token: item.idempotency_token,
+        name: item.data.name,
+        phone: item.data.phone,
+        address: item.data.address,
+        preferred_channel: item.data.preferred_channel,
+        language: item.data.language,
+        legal_problem: item.data.legal_problem,
+        incident_description: item.data.incident_description,
+        simulate_conflict: item.data.simulate_conflict,
+      })
+    });
+
+    const res = await response.json();
+
+    if (res.status === 'synced') {
+      item.status = 'SYNCED';
+      item.server_app_id = res.application_id;
+      item.error = null;
+      item.conflict_data = null;
+    } else if (res.status === 'conflict') {
+      item.status = 'CONFLICT';
+      item.conflict_data = res;
+      openConflictModal(tempId);
+    } else {
+      item.status = 'FAILED';
+      item.error = res.error || "Server error";
+      alert("Sync failed for " + tempId + ": " + item.error);
+    }
+  } catch (err) {
+    item.status = 'FAILED';
+    item.error = err.message;
+    alert("Network sync error for " + tempId + ": " + err.message);
+  }
+
+  saveQueue(queue);
+}
+
+// Sync all queued items
+async function syncAllQueuedItems() {
+  const isOffline = (localStorage.getItem(STORAGE_MODE_KEY) === 'true');
+  if (isOffline) {
+    alert("⚠️ Cannot synchronize while Offline Mode is simulated!\nPlease click 'Simulate Online Mode' first to restore connection.");
+    return;
+  }
+
+  const queue = getQueue();
+  const pending = queue.filter(it => it.status === 'QUEUED' || it.status === 'FAILED');
+
+  if (pending.length === 0) {
+    alert("No pending items to sync in local queue.");
+    return;
+  }
+
+  for (const item of pending) {
+    await syncSingleItem(item.temp_id);
+  }
+}
+
+// Open Conflict Modal / Card
+function openConflictModal(tempId) {
+  const queue = getQueue();
+  const item = queue.find(it => it.temp_id === tempId);
+  if (!item || !item.conflict_data) return;
+
+  activeConflictItem = item;
+  const res = item.conflict_data;
+
+  document.getElementById('conflictReasonText').innerText = res.conflict_reason || "Matching server record has differing applicant or incident data.";
+
+  const local = res.local_version || item.data;
+  document.getElementById('localVersionDisplay').innerHTML = `
+    <strong>Name:</strong> ${local.name}<br>
+    <strong>Phone:</strong> ${local.phone}<br>
+    <strong>Address:</strong> ${local.address}<br>
+    <strong>Legal Problem:</strong> ${local.legal_problem}<br>
+    <strong>Incident:</strong> <span style="font-size: 0.82rem;">${local.incident_description}</span>
+  `;
+
+  const server = res.server_version || {};
+  document.getElementById('serverVersionDisplay').innerHTML = `
+    <strong>Server App ID:</strong> ${server.application_id || 'N/A'}<br>
+    <strong>Name:</strong> ${server.name || 'N/A'}<br>
+    <strong>Phone:</strong> ${server.phone || 'N/A'}<br>
+    <strong>Address:</strong> ${server.address || 'N/A'}<br>
+    <strong>Legal Problem:</strong> ${server.legal_problem || 'N/A'}<br>
+    <strong>Incident:</strong> <span style="font-size: 0.82rem;">${server.incident_description || 'N/A'}</span>
+  `;
+
+  const modal = document.getElementById('conflictResolutionCard');
+  modal.style.display = 'block';
+  modal.scrollIntoView({ behavior: 'smooth' });
+}
+
+function cancelConflictModal() {
+  document.getElementById('conflictResolutionCard').style.display = 'none';
+  activeConflictItem = null;
+}
+
+// Human Conflict Resolution: Keep Local or Keep Server
+async function resolveConflict(resolutionChoice) {
+  if (!activeConflictItem) return;
+
+  const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+  const queue = getQueue();
+  const item = queue.find(it => it.temp_id === activeConflictItem.temp_id);
+
+  try {
+    const response = await fetch("{% url 'cases:offline_conflict_resolve' %}", {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrfToken,
+      },
+      body: JSON.stringify({
+        temp_id: item.temp_id,
+        resolution_choice: resolutionChoice,
+        server_app_id: item.conflict_data ? item.conflict_data.server_version.application_id : null,
+        local_data: item.data,
+      })
+    });
+
+    const res = await response.json();
+    if (res.status === 'resolved') {
+      item.status = 'SYNCED';
+      item.server_app_id = res.application_id;
+      item.conflict_data = null;
+      saveQueue(queue);
+      cancelConflictModal();
+      alert("Conflict successfully resolved using '" + resolutionChoice + "'. Official Application ID: " + res.application_id);
+    } else {
+      alert("Resolution error: " + (res.error || "Unknown server error"));
+    }
+  } catch (err) {
+    alert("Network error while resolving conflict: " + err.message);
+  }
+}
+
+// Clear synced items from local queue
+function clearSyncedItems() {
+  const queue = getQueue();
+  const remaining = queue.filter(it => it.status !== 'SYNCED');
+  saveQueue(remaining);
+}
+
+// Delete single queue item
+function deleteQueueItem(tempId) {
+  if (!confirm("Are you sure you want to delete local queue item " + tempId + "?")) return;
+  const queue = getQueue();
+  const updated = queue.filter(it => it.temp_id !== tempId);
+  saveQueue(updated);
+  if (activeConflictItem && activeConflictItem.temp_id === tempId) {
+    cancelConflictModal();
+  }
+}
+
+// Fill sample intake for instant testing
+function fillSampleIntake() {
+  document.getElementById('inp_name').value = 'মোছাঃ লাইলী বেগম';
+  document.getElementById('inp_phone').value = '01733889900';
+  document.getElementById('inp_address').value = 'চর কাদিরা, রামগতি, লক্ষ্মীপুর';
+  document.getElementById('inp_problem').value = 'নদীভাঙন কবলিত পুনর্বাসন খাস জমি দখল ও সীমানা বিরোধ';
+  document.getElementById('inp_incident').value = 'চর কাদিরা মৌজায় সরকার কর্তৃক বরাদ্দকৃত পুনর্বাসন খাস জমি গত সপ্তাহে স্থানীয় প্রভাবশালীরা অবৈধভাবে দখল করে ঘর নির্মাণ করেছে। অবিলম্বে আইনি সহায়তা ও দখল পুনরুদ্ধারের আবেদন।';
+}
+</script>
+{% endblock %}

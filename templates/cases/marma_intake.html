@@ -1,0 +1,243 @@
+{% extends 'base.html' %}
+{% load dlas_tags %}
+
+{% block title %}
+  {% tr "Marma Assisted Intake - DLAS" "মারমা ভাষায় সহায়তাকৃত আবেদন - ডিএলএএস" %}
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 900px; margin: 1.5rem auto;">
+  <div class="dashboard-header">
+    <div>
+      <h2>{% tr "Marma Indigenous Language Assisted Intake" "মারমা ভাষায় সহায়তাকৃত আইনি সহায়তা আবেদন" %}</h2>
+      <p style="color: var(--text-muted); font-size: 0.92rem;">
+        {% tr "Preserves linguistic integrity across the provenance chain: Marma Said → Translated → Typed." "ভাষাগত শুদ্ধতা ও উৎসের ধারাবাহিকতা সংরক্ষণ: মারমা ভাষায় বলা → অনুবাদ → টাইপ করা।" %}
+      </p>
+    </div>
+    <div>
+      <span class="role-pill">{% tr "Assisted Door" "সহায়তাকৃত চ্যানেল" %}</span>
+    </div>
+  </div>
+
+  <!-- Mandatory Provenance Protection Banner -->
+  <div class="card" style="border-left: 4px solid #059669; background-color: #ecfdf5; margin-bottom: 1.5rem;">
+    <h4 style="color: #065f46; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+      <span>🛡️</span> {% tr "Linguistic Provenance & Anti-Misattribution Guarantee" "ভাষাগত উৎস ও বিকৃতিহীনতার নিশ্চয়তা" %}
+    </h4>
+    <p style="font-size: 0.88rem; color: #047857; margin-bottom: 0.5rem;">
+      {% tr "The system strictly maintains the distinction between what the applicant originally stated in Marma, what was translated by an intermediary, and what was structured by staff." "আবেদনকারী মারমা ভাষায় যা বলেছেন, অনুবাদক যা অনুবাদ করেছেন এবং কর্মকর্তা যা টাইপ করেছেন—তার প্রতিটি স্তর সিস্টেমে পৃথকভাবে সংরক্ষিত হয়।" %}
+    </p>
+    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.75rem;">
+      <span class="badge" style="background-color: #d1fae5; color: #065f46; border: 1px solid #6ee7b7;">
+        🗣️ 1. {% tr "Marma Said (Applicant-Confirmed)" "মারমা ভাষায় বলা (আবেদনকারী-অনুমোদিত)" %}
+      </span>
+      <span>→</span>
+      <span class="badge" style="background-color: #dbeafe; color: #1e40af; border: 1px solid #93c5fd;">
+        🔄 2. {% tr "Translated (Intermediary-Translated)" "অনুবাদ (সহকারী-অনূদিত)" %}
+      </span>
+      <span>→</span>
+      <span class="badge" style="background-color: #fef3c7; color: #92400e; border: 1px solid #fcd34d;">
+        📝 3. {% tr "Typed (Staff-Entered)" "টাইপ করা (অপারেটর-টাইপকৃত)" %}
+      </span>
+    </div>
+    <p style="font-size: 0.82rem; color: #065f46; margin-top: 0.5rem; font-style: italic;">
+      {% tr "Crucial Rule: Translated and typed text will NEVER be falsely labeled as applicant-originated." "জরুরি নিয়ম: অনূদিত বা টাইপকৃত লেখাকে কখনোই আবেদনকারীর নিজস্ব সরাসরি বক্তব্য হিসেবে মিথ্যা উপস্থাপন করা যাবে না।" %}
+    </p>
+  </div>
+
+  <!-- Quick Demo Fill Buttons -->
+  <div class="card" style="margin-bottom: 1.5rem; background-color: #f8fafc;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+      <span style="font-size: 0.88rem; font-weight: 700; color: var(--text-secondary);">
+        {% tr "Hackathon Quick Demo Fill:" "হ্যাকথন ডেমো তাৎক্ষণিক পূরণ:" %}
+      </span>
+      <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="populateDemo1()">
+          {% tr "Demo 1: Land Encroachment" "ডেমো ১: জমি জবরদখল ও সীমানা" %}
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="populateDemo2()">
+          {% tr "Demo 2: Customary Forest Rights" "ডেমো ২: পাড়ার প্রথাগত জুম অধিকার" %}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Intake Form -->
+  <div class="card">
+    <form method="POST" action="{% url 'cases:marma_intake' %}">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="confirm">
+
+      <h3 style="margin-bottom: 1rem; color: var(--primary-color); border-bottom: 2px solid var(--border-color); padding-bottom: 0.5rem;">
+        {% tr "Section 1: Applicant Profile" "অংশ ১: আবেদনকারীর পরিচয়" %}
+      </h3>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label" for="id_name">{% tr "Applicant Full Name *" "আবেদনকারীর পূর্ণ নাম *" %}</label>
+          {{ form.name }}
+          {% if form.name.errors %}<div class="form-error">{{ form.name.errors.0 }}</div>{% endif %}
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="id_phone">{% tr "Mobile Phone Number *" "মোবাইল ফোন নম্বর *" %}</label>
+          {{ form.phone }}
+          {% if form.phone.errors %}<div class="form-error">{{ form.phone.errors.0 }}</div>{% endif %}
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="id_address">{% tr "Address (Village/Para, Mouza, Upazila, District) *" "ঠিকানা (পাড়া/গ্রাম, মৌজা, উপজেলা, পার্বত্য জেলা) *" %}</label>
+        {{ form.address }}
+        {% if form.address.errors %}<div class="form-error">{{ form.address.errors.0 }}</div>{% endif %}
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label" for="id_statement_language">{% tr "Indigenous Language" "আবেদনকারীর মাতৃভাষা" %}</label>
+          {{ form.statement_language }}
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="id_nid_number">{% tr "NID Number (Optional)" "জাতীয় পরিচয়পত্র নম্বর (ঐচ্ছিক)" %}</label>
+          {{ form.nid_number }}
+        </div>
+      </div>
+
+      <h3 style="margin-top: 1.5rem; margin-bottom: 1rem; color: var(--primary-color); border-bottom: 2px solid var(--border-color); padding-bottom: 0.5rem;">
+        {% tr "Section 2: The Three-Tier Linguistic Provenance Chain" "অংশ ২: ত্রিস্তরীয় ভাষাগত উৎসের ধারাবাহিকতা" %}
+      </h3>
+
+      <!-- Layer 1: Marma Said -->
+      <div class="form-group" style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-md); padding: 1rem;">
+        <label class="form-label" for="id_original_statement" style="color: #166534; font-weight: 700; display: flex; justify-content: space-between;">
+          <span>🗣️ Layer 1: {% tr "Marma Said / মারমা ভাষায় বলা বক্তব্য (Original Oral Statement) *" "স্তর ১: মারমা ভাষায় বলা বক্তব্য (আসল মৌখিক বিবৃতি) *" %}</span>
+          <span class="badge" style="background-color: #dcfce7; color: #15803d;">{% tr "Provenance: Applicant-Confirmed" "উৎস: আবেদনকারী-অনুমোদিত" %}</span>
+        </label>
+        <span class="form-hint" style="color: #15803d; margin-bottom: 0.5rem; display: block;">
+          {% tr "Record the exact words spoken by the applicant in Marma (script or phonetic/transcription)." "আবেদনকারী মারমা ভাষায় যা বলেছেন অবিকল তা লিপিবদ্ধ করুন (মারমা লিপি বা বাংলা ফোনেটিক রূপ)।" %}
+        </span>
+        {{ form.original_statement }}
+        {% if form.original_statement.errors %}<div class="form-error">{{ form.original_statement.errors.0 }}</div>{% endif %}
+      </div>
+
+      <!-- Layer 2: Intermediary Translation -->
+      <div class="form-group" style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius-md); padding: 1rem;">
+        <label class="form-label" for="id_translated_statement" style="color: #1e40af; font-weight: 700; display: flex; justify-content: space-between;">
+          <span>🔄 Layer 2: {% tr "Translated / অনুবাদ (Intermediary Translation) *" "স্তর ২: অনুবাদ (সহকারী বা অনুবাদকের করা অনুবাদ) *" %}</span>
+          <span class="badge" style="background-color: #dbeafe; color: #1e40af;">{% tr "Provenance: Intermediary-Translated" "উৎস: সহকারী-অনূদিত" %}</span>
+        </label>
+        <span class="form-hint" style="color: #1e40af; margin-bottom: 0.5rem; display: block;">
+          {% tr "Clear Bangla/English translation performed by the assisting operator or accredited interpreter." "সহায়তাকারী কর্মকর্তা বা অনুবাদক কর্তৃক মারমা বক্তব্যের সঠিক বাংলা বা ইংরেজি অনুবাদ।" %}
+        </span>
+        {{ form.translated_statement }}
+        {% if form.translated_statement.errors %}<div class="form-error">{{ form.translated_statement.errors.0 }}</div>{% endif %}
+      </div>
+
+      <!-- Layer 3: Typed Structured Application Data -->
+      <div class="form-group" style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: var(--radius-md); padding: 1rem;">
+        <label class="form-label" style="color: #92400e; font-weight: 700; display: flex; justify-content: space-between;">
+          <span>📝 Layer 3: {% tr "Typed / টাইপ করা (Structured Legal Application Data) *" "স্তর ৩: টাইপ করা (কাঠামোগত আইনি তথ্য) *" %}</span>
+          <span class="badge" style="background-color: #fef3c7; color: #92400e;">{% tr "Provenance: Staff-Entered" "উৎস: অপারেটর-টাইপকৃত" %}</span>
+        </label>
+        <span class="form-hint" style="color: #92400e; margin-bottom: 0.5rem; display: block;">
+          {% tr "Official structured legal problem and incident narrative prepared from the translated statement." "অনূদিত তথ্যের ভিত্তিতে প্রস্তুতকৃত দাপ্তরিক আইনি সমস্যা ও ঘটনার সারসংক্ষেপ।" %}
+        </span>
+        
+        <div style="margin-bottom: 0.75rem;">
+          <label class="form-label" for="id_legal_problem" style="font-size: 0.85rem;">{% tr "Structured Legal Problem *" "কাঠামোগত আইনি সমস্যা *" %}</label>
+          {{ form.legal_problem }}
+          {% if form.legal_problem.errors %}<div class="form-error">{{ form.legal_problem.errors.0 }}</div>{% endif %}
+        </div>
+
+        <div>
+          <label class="form-label" for="id_incident_description" style="font-size: 0.85rem;">{% tr "Structured Incident Details *" "ঘটনার সুনির্দিষ্ট আইনি বিবরণ *" %}</label>
+          {{ form.incident_description }}
+          {% if form.incident_description.errors %}<div class="form-error">{{ form.incident_description.errors.0 }}</div>{% endif %}
+        </div>
+      </div>
+
+      <!-- Safe Contact Protocol -->
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label" for="id_safe_contact_number">{% tr "Safe Contact Phone (Optional)" "বিকল্প নিরাপদ ফোন (ঐচ্ছিক)" %}</label>
+          {{ form.safe_contact_number }}
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="id_safe_contact_time">{% tr "Safe Contact Time (Optional)" "নিরাপদ যোগাযোগের সময় (ঐচ্ছিক)" %}</label>
+          {{ form.safe_contact_time }}
+        </div>
+      </div>
+
+      <h3 style="margin-top: 1.5rem; margin-bottom: 1rem; color: var(--primary-color); border-bottom: 2px solid var(--border-color); padding-bottom: 0.5rem;">
+        {% tr "Section 3: Mandatory Pre-Submission Verifications" "অংশ ৩: জমাদানপূর্ব বাধ্যতামূলক যাচাইকরণ" %}
+      </h3>
+
+      <div style="background-color: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1.25rem;">
+        <div style="display: flex; gap: 0.75rem; align-items: flex-start; margin-bottom: 0.75rem;">
+          {{ form.verify_translation }}
+          <label for="id_verify_translation" style="font-size: 0.9rem; cursor: pointer;">
+            <strong>{% tr "Verification 1:" "যাচাই ১:" %}</strong>
+            {% tr "I verify that the translation accurately represents what was originally said in Marma by the applicant. / আমি নিশ্চিত করছি যে অনুবাদটি আবেদনকারীর মারমা ভাষায় বলা আসল বক্তব্যের সঠিক প্রতিফলন।" "আমি নিশ্চিত করছি যে অনুবাদটি আবেদনকারীর মারমা ভাষায় বলা আসল বক্তব্যের সঠিক প্রতিফলন।" %}
+          </label>
+        </div>
+        {% if form.verify_translation.errors %}<div class="form-error" style="margin-left: 2rem;">{{ form.verify_translation.errors.0 }}</div>{% endif %}
+
+        <div style="display: flex; gap: 0.75rem; align-items: flex-start; margin-bottom: 0.75rem;">
+          {{ form.verify_typed_data }}
+          <label for="id_verify_typed_data" style="font-size: 0.9rem; cursor: pointer;">
+            <strong>{% tr "Verification 2:" "যাচাই ২:" %}</strong>
+            {% tr "I verify that the typed structured application data accurately represents the translated statement without omission or distortion. / আমি নিশ্চিত করছি যে টাইপকৃত আইনি তথ্য অনুবাদের সাথে সম্পূর্ণ সামঞ্জস্যপূর্ণ।" "আমি নিশ্চিত করছি যে টাইপকৃত আইনি তথ্য অনুবাদের সাথে সম্পূর্ণ সামঞ্জস্যপূর্ণ।" %}
+          </label>
+        </div>
+        {% if form.verify_typed_data.errors %}<div class="form-error" style="margin-left: 2rem;">{{ form.verify_typed_data.errors.0 }}</div>{% endif %}
+
+        <div style="display: flex; gap: 0.75rem; align-items: flex-start;">
+          {{ form.applicant_consent }}
+          <label for="id_applicant_consent" style="font-size: 0.9rem; cursor: pointer;">
+            <strong>{% tr "Verification 3:" "যাচাই ৩:" %}</strong>
+            {% tr "Informed consent obtained and entire translated summary read back to applicant in an understandable manner. / নাগরিকের সম্মতি গ্রহণ করা হয়েছে এবং সম্পূর্ণ বিবরণ আবেদনকারীকে পাঠ করে শোনানো হয়েছে।" "নাগরিকের সম্মতি গ্রহণ করা হয়েছে এবং সম্পূর্ণ বিবরণ আবেদনকারীকে পাঠ করে শোনানো হয়েছে।" %}
+          </label>
+        </div>
+        {% if form.applicant_consent.errors %}<div class="form-error" style="margin-left: 2rem;">{{ form.applicant_consent.errors.0 }}</div>{% endif %}
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 1rem;">
+        <a href="{% url 'dashboard:udc_operator' %}" class="btn btn-secondary">
+          {% tr "Cancel" "বাতিল" %}
+        </a>
+        <button type="submit" class="btn btn-primary">
+          🔍 {% tr "Review & Verify Provenance Chain →" "উৎসের ধারাবাহিকতা পর্যালোচনা ও যাচাই করুন →" %}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function populateDemo1() {
+  document.getElementById('id_name').value = 'মং শোয়ে প্রু মারমা';
+  document.getElementById('id_phone').value = '01844000999';
+  document.getElementById('id_address').value = 'রোয়াংছড়ি মৌজা, রোয়াংছড়ি, বান্দরবান';
+  document.getElementById('id_original_statement').value = 'အကျွန်မြေယာ ပြဿနာ ကြုံနေရပါတယ် (আমি আমার জমি নিয়ে সমস্যায় পড়েছি — পৈতৃক কৃষিজমি জবরদখল)';
+  document.getElementById('id_translated_statement').value = 'আমার পৈতৃক কৃষিজমি স্থানীয় প্রতিপক্ষরা জোরপূর্বক দখল করে নিয়েছে এবং সীমানা পিলার ভেঙে ফেলেছে।';
+  document.getElementById('id_legal_problem').value = 'জমি জবরদখল ও সীমানা বিরোধ (Land Encroachment & Boundary Dispute)';
+  document.getElementById('id_incident_description').value = 'বান্দরবান রোয়াংছড়ি মৌজায় পৈতৃক রেকর্ডভুক্ত ২ একর কৃষিজমি গত ১৫ সেপ্টেম্বর স্থানীয় প্রতিপক্ষরা জোরপূর্বক দখল করে নিয়েছে। আইনি প্রতিকার ও সীমানা পুনর্নির্ধারণ প্রার্থনা।';
+  document.getElementById('id_verify_translation').checked = true;
+  document.getElementById('id_verify_typed_data').checked = true;
+  document.getElementById('id_applicant_consent').checked = true;
+}
+
+function populateDemo2() {
+  document.getElementById('id_name').value = 'উ অং থুই মারমা';
+  document.getElementById('id_phone').value = '01855112233';
+  document.getElementById('id_address').value = 'বাঘাইছড়ি মৌজা, রাঙ্গামাটি পার্বত্য জেলা';
+  document.getElementById('id_original_statement').value = 'ရွာမြေနှင့် သစ်တော အခွင့်အရေး ကိစ္စ (পাড়াবাসীর জুম ও বনজ অধিকার সমস্যা)';
+  document.getElementById('id_translated_statement').value = 'মারমা পাড়াবাসীর ঐতিহ্যগত জুমচাষের জমিতে বহিরাগতদের অনধিকার প্রবেশ ও চলাচলের প্রথাগত পথ অবরোধ করা হয়েছে।';
+  document.getElementById('id_legal_problem').value = 'প্রথাগত ভূমি অধিকার ও চলাচলের পথ অবরোধ (Customary Land Rights & Pathway Obstruction)';
+  document.getElementById('id_incident_description').value = 'ঐতিহ্যগত পাড়াবাসীর চলাচল ও জুম চাষের জমিতে অনধিকার প্রবেশের মাধ্যমে রাস্তা বন্ধ করে দেয়া হয়েছে। স্থানীয় মধ্যস্থতা ব্যর্থ হওয়ায় জরুরি আইনি সহায়তা কাম্য।';
+  document.getElementById('id_verify_translation').checked = true;
+  document.getElementById('id_verify_typed_data').checked = true;
+  document.getElementById('id_applicant_consent').checked = true;
+}
+</script>
+{% endblock %}

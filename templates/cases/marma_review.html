@@ -1,0 +1,172 @@
+{% extends 'base.html' %}
+{% load dlas_tags %}
+
+{% block title %}
+  {% tr "Verify Marma Provenance Chain - DLAS" "মারমা উৎসের ধারাবাহিকতা নিশ্চিতকরণ - ডিএলএএস" %}
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 900px; margin: 1.5rem auto;">
+  <div class="dashboard-header">
+    <div>
+      <h2>{% tr "Pre-Submission Provenance Verification" "জমাদানপূর্ব ভাষাগত উৎসের ধারাবাহিকতা যাচাই" %}</h2>
+      <p style="color: var(--text-muted); font-size: 0.92rem;">
+        {% tr "Verify that the chain: Marma Said → Translated → Typed is faithfully preserved." "মারমা ভাষায় বলা → অনুবাদ → টাইপ করা — ধারাবাহিকতা যাচাই ও নিশ্চিত করুন।" %}
+      </p>
+    </div>
+    <div>
+      <span class="badge badge-under-review" style="font-size: 0.9rem; padding: 0.4rem 0.8rem;">
+        {% tr "Verification Gate" "যাচাইকরণ ধাপ" %}
+      </span>
+    </div>
+  </div>
+
+  <!-- Provenance Chain Diagram -->
+  <div class="card" style="border-top: 4px solid var(--primary-color); margin-bottom: 1.5rem;">
+    <h3 style="margin-bottom: 1rem; color: var(--primary-color);">
+      {% tr "Verified Three-Tier Provenance Pipeline" "যাচাইকৃত ত্রিস্তরীয় ভাষাগত উৎস প্রবাহ" %}
+    </h3>
+
+    <!-- Step 1: Said -->
+    <div style="background-color: #f0fdf4; border: 2px solid #86efac; border-radius: var(--radius-md); padding: 1.25rem; margin-bottom: 1rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap;">
+        <h4 style="color: #166534; margin: 0;">
+          🗣️ {% tr "Tier 1: Marma Said (Original Oral Statement)" "স্তর ১: মারমা ভাষায় বলা (আসল বক্তব্য)" %}
+        </h4>
+        <span class="badge" style="background-color: #dcfce7; color: #15803d; border: 1px solid #86efac;">
+          {% tr "Provenance: Applicant-Confirmed" "উৎস: আবেদনকারী-অনুমোদিত" %}
+        </span>
+      </div>
+      <p style="font-size: 1.05rem; font-weight: 600; color: #14532d; white-space: pre-wrap; margin: 0;">
+        "{{ data.original_statement }}"
+      </p>
+      <small style="color: #15803d; display: block; margin-top: 0.4rem;">
+        {% tr "Language:" "ভাষা:" %} <strong>Marma / মারমা</strong> &bull; {% tr "Attributed directly to citizen applicant." "সরাসরি আবেদনকারীর নিজস্ব বক্তব্য।" %}
+      </small>
+    </div>
+
+    <!-- Arrow Down -->
+    <div style="text-align: center; margin: -0.5rem 0 0.5rem 0; font-size: 1.5rem; color: var(--text-muted);">
+      ↓
+    </div>
+
+    <!-- Step 2: Translated -->
+    <div style="background-color: #eff6ff; border: 2px solid #93c5fd; border-radius: var(--radius-md); padding: 1.25rem; margin-bottom: 1rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap;">
+        <h4 style="color: #1e40af; margin: 0;">
+          🔄 {% tr "Tier 2: Intermediary Translation" "স্তর ২: অনুবাদ (অনুবাদকের করা অনুবাদ)" %}
+        </h4>
+        <span class="badge" style="background-color: #dbeafe; color: #1e40af; border: 1px solid #93c5fd;">
+          {% tr "Provenance: Intermediary-Translated" "উৎস: সহকারী-অনূদিত" %}
+        </span>
+      </div>
+      <p style="font-size: 1rem; color: #1e3a8a; white-space: pre-wrap; margin: 0;">
+        "{{ data.translated_statement }}"
+      </p>
+      <small style="color: #1e40af; display: block; margin-top: 0.4rem;">
+        {% tr "Target Language: Bangla / বাংলা" "অনুবাদ ভাষা: বাংলা" %} &bull; 
+        <strong>{% tr "Explicitly attributed to operator/interpreter; NOT falsely labeled as applicant-originated." "স্পষ্টভাবে অনুবাদক/অপারেটরের বক্তব্য হিসেবে চিহ্নিত; আবেদনকারীর মূল বক্তব্য বলে মিথ্যা উপস্থাপন করা হয়নি।" %}</strong>
+      </small>
+    </div>
+
+    <!-- Arrow Down -->
+    <div style="text-align: center; margin: -0.5rem 0 0.5rem 0; font-size: 1.5rem; color: var(--text-muted);">
+      ↓
+    </div>
+
+    <!-- Step 3: Typed Structured Application -->
+    <div style="background-color: #fffbeb; border: 2px solid #fde68a; border-radius: var(--radius-md); padding: 1.25rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap;">
+        <h4 style="color: #92400e; margin: 0;">
+          📝 {% tr "Tier 3: Typed Structured Application Data" "স্তর ৩: টাইপ করা কাঠামোগত আইনি তথ্য" %}
+        </h4>
+        <span class="badge" style="background-color: #fef3c7; color: #92400e; border: 1px solid #fcd34d;">
+          {% tr "Provenance: Staff-Entered" "উৎস: অপারেটর-টাইপকৃত" %}
+        </span>
+      </div>
+      <div style="margin-bottom: 0.5rem;">
+        <strong style="color: #78350f;">{% tr "Structured Legal Problem:" "কাঠামোগত আইনি সমস্যা:" %}</strong>
+        <span style="color: #92400e;">{{ data.legal_problem }}</span>
+      </div>
+      <div>
+        <strong style="color: #78350f;">{% tr "Structured Incident Details:" "ঘটনার সুনির্দিষ্ট আইনি বিবরণ:" %}</strong>
+        <p style="color: #92400e; margin-top: 0.25rem; white-space: pre-wrap;">{{ data.incident_description }}</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Applicant Summary Details -->
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <h4 style="margin-bottom: 0.75rem; color: var(--secondary-color);">
+      {% tr "Applicant Details & Safe Contact" "আবেদনকারীর তথ্য ও নিরাপদ যোগাযোগ" %}
+    </h4>
+    <div class="grid-2">
+      <div>
+        <small style="color: var(--text-muted);">{% tr "Applicant Name" "আবেদনকারীর নাম" %}:</small><br>
+        <strong>{{ data.name }}</strong>
+      </div>
+      <div>
+        <small style="color: var(--text-muted);">{% tr "Contact Phone" "যোগাযোগের ফোন" %}:</small><br>
+        <strong>{{ data.phone }}</strong>
+      </div>
+      <div>
+        <small style="color: var(--text-muted);">{% tr "Address" "ঠিকানা" %}:</small><br>
+        <span>{{ data.address }}</span>
+      </div>
+      <div>
+        <small style="color: var(--text-muted);">{% tr "Safe Contact Protocol" "নিরাপদ যোগাযোগ নির্দেশিকা" %}:</small><br>
+        <span>
+          {% if data.safe_contact_number %}
+            {{ data.safe_contact_number }} ({{ data.safe_contact_time|default:"Anytime" }})
+          {% else %}
+            {% tr "Direct Contact" "সরাসরি যোগাযোগ" %}
+          {% endif %}
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirmation Checklist Attestations -->
+  <div class="card" style="background-color: #f8fafc; border-left: 4px solid var(--secondary-color); margin-bottom: 1.5rem;">
+    <h4 style="color: var(--secondary-color); margin-bottom: 0.5rem;">
+      {% tr "Operator Pre-Submission Attestation" "জমাদানপূর্ব অপারেটরের প্রত্যয়ন" %}
+    </h4>
+    <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 0.35rem;">
+      ✓ {% tr "Verified that the translation accurately represents what was said in Marma." "অনুবাদটি আবেদনকারীর মারমা বক্তব্যের সঠিক প্রতিফলন হিসেবে যাচাই করা হয়েছে।" %}
+    </p>
+    <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 0.35rem;">
+      ✓ {% tr "Verified that the structured typed data accurately represents the translated statement." "টাইপকৃত কাঠামোগত তথ্য অনুবাদের সাথে সম্পূর্ণ সামঞ্জস্যপূর্ণ।" %}
+    </p>
+    <p style="font-size: 0.88rem; color: var(--text-secondary);">
+      ✓ {% tr "Application ID will be generated upon submission; Case ID is NOT generated before DLAO acceptance." "জমাদানের পর আবেদন নম্বর তৈরি হবে; ডিএলএও কর্মকর্তার অনুমোদন ব্যতীত কোনো কেস আইডি তৈরি হবে না।" %}
+    </p>
+  </div>
+
+  <!-- Form Actions: Edit Correction OR Confirm Submit -->
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+    <!-- Edit / Correction Form -->
+    <form method="POST" action="{% url 'cases:marma_intake' %}">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="edit">
+      {% for field in form %}
+        <input type="hidden" name="{{ field.name }}" value="{{ field.value|default_if_none:'' }}">
+      {% endfor %}
+      <button type="submit" class="btn btn-secondary">
+        ← {% tr "Edit / Make Corrections" "← সম্পাদনা / সংশোধন করুন" %}
+      </button>
+    </form>
+
+    <!-- Final Submit Form -->
+    <form method="POST" action="{% url 'cases:marma_intake' %}">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="submit">
+      {% for field in form %}
+        <input type="hidden" name="{{ field.name }}" value="{{ field.value|default_if_none:'' }}">
+      {% endfor %}
+      <button type="submit" class="btn btn-primary" style="font-size: 1.05rem; padding: 0.65rem 1.5rem;">
+        ✓ {% tr "Confirm & Submit Application" "✓ নিশ্চিত ও চূড়ান্ত দাখিল করুন" %}
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}

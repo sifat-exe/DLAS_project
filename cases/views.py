@@ -9,11 +9,12 @@ from django.urls import reverse
 from cases.conversational_service import BanglaConversationalService
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
+import json
 from accounts.models import UserProfile
-from accounts.permissions import has_role, can_access_application, can_access_case
+from accounts.permissions import has_role, can_access_application, can_access_case, get_user_role
 from cases.models import Application, CaseRecord, CaseEvent, Task, RelatedCase, DuplicateCandidate, Communication
 from documents.models import Document, Signature
-from cases.forms import CitizenApplicationForm, UDCAssistedApplicationForm
+from cases.forms import CitizenApplicationForm, UDCAssistedApplicationForm, MarmaAssistedIntakeForm
 from cases.services import (
     submit_application,
     accept_application,
@@ -28,6 +29,9 @@ from cases.services import (
     verify_case_document,
     link_related_cases,
     review_duplicate_candidate,
+    submit_marma_intake,
+    process_offline_sync,
+    resolve_offline_conflict,
 )
 from cases.ai_service import MockAIService
 from core.mock_services import (
@@ -1054,5 +1058,200 @@ def ripon_voice_task_demo(request):
         )
 
     return redirect('cases:voice_task', task_id=task.id)
+
+
+# =============================================================================
+# BATCH 3 — PART A: MARMA PROVENANCE WORKFLOW
+# =============================================================================
+
+@login_required
+def marma_intake_view(request):
+    """
+    Marma Indigenous Language Assisted Intake (Batch 3 Part A).
+    Preserves:
+      MARMA SAID -> TRANSLATED -> TYPED -> APPLICATION DATA
+    Workflow:
+      1. Entry of applicant data, Marma oral statement, intermediary translation, typed data.
+      2. Verification & Confirmation Step: confirms translation represents what was said,
+         and typed data represents translation.
+      3. Corrections allowed before submission.
+      4. Submits via submit_marma_intake service:
+         - Generates Application ID
+         - No Case ID before DLAO acceptance
+         - Logs marma_statement_recorded, marma_translation_recorded, marma_typed_confirmation, APPLICATION_SUBMITTED.
+    """
+    if request.method == 'POST':
+        action = request.POST.get('action', 'confirm')
+        form = MarmaAssistedIntakeForm(request.POST)
+        
+        if action == 'edit':
+            return render(request, 'cases/marma_intake.html', {'form': form})
+            
+        if form.is_valid():
+            cleaned = form.cleaned_data
+            
+            if action == 'confirm':
+                # Show explicit verification preview step
+                return render(request, 'cases/marma_review.html', {
+                    'form': form,
+                    'data': cleaned,
+                })
+                
+            elif action == 'submit':
+                # Final submission using existing Application submission architecture
+                app = submit_marma_intake(
+                    name=cleaned['name'],
+                    phone=cleaned['phone'],
+                    address=cleaned['address'],
+                    original_statement=cleaned['original_statement'],
+                    translated_statement=cleaned['translated_statement'],
+                    typed_legal_problem=cleaned['legal_problem'],
+                    typed_incident_description=cleaned['incident_description'],
+                    statement_language=cleaned.get('statement_language', 'marma'),
+                    actor=request.user,
+                    applicant_user=None,  # Assisted intake
+                    preferred_channel=Application.CHANNEL_UDC,
+                    safe_contact_number=cleaned.get('safe_contact_number', ''),
+                    safe_contact_time=cleaned.get('safe_contact_time', ''),
+                    nid_number=cleaned.get('nid_number', '')
+                )
+                messages.success(
+                    request,
+                    f"Marma assisted application submitted successfully! Application ID: {app.application_id} / মারমা ভাষায় সহায়তাকৃত আবেদন সফলভাবে গৃহীত হয়েছে! আবেদন নম্বর: {app.application_id}"
+                )
+                return redirect('cases:application_detail', application_id=app.application_id)
+        else:
+            messages.error(request, "Please correct the errors in the Marma intake form / অনুগ্রহ করে ফর্মের ত্রুটিগুলো সংশোধন করুন।")
+    else:
+        # Pre-fill sample Marma case for instant hackathon demonstration
+        initial = {
+            'name': 'মং শোয়ে প্রু মারমা',
+            'phone': '01844000999',
+            'address': 'রোয়াংছড়ি মৌজা, রোয়াংছড়ি, বান্দরবান',
+            'statement_language': 'marma',
+            'original_statement': 'အကျွန်မြေယာ ပြဿနာ ကြုံနေရပါတယ် (আমি আমার জমি নিয়ে সমস্যায় পড়েছি — পৈতৃক কৃষিজমি জবরদখল)',
+            'translated_statement': 'আমার পৈতৃক কৃষিজমি প্রভাবশালী প্রতিপক্ষরা জোরপূর্বক দখল করে নিয়েছে এবং সীমানা পিলার ভেঙে ফেলেছে।',
+            'legal_problem': 'জমি জবরদখল ও সীমানা বিরোধ (Land Encroachment & Boundary Dispute)',
+            'incident_description': 'বান্দরবান রোয়াংছড়ি মৌজায় পৈতৃক রেকর্ডভুক্ত ২ একর কৃষিজমি গত ১৫ সেপ্টেম্বর স্থানীয় প্রতিপক্ষরা জোরপূর্বক দখল করে নিয়েছে। আইনি প্রতিকার ও সীমানা পুনর্নির্ধারণ প্রার্থনা।',
+        }
+        form = MarmaAssistedIntakeForm(initial=initial)
+        
+    return render(request, 'cases/marma_intake.html', {'form': form})
+
+
+# =============================================================================
+# BATCH 3 — PART B, C, D: TRUE OFFLINE QUEUE, SYNC & CONFLICT RESOLUTION
+# =============================================================================
+
+@login_required
+def offline_queue_view(request):
+    """
+    True Offline Queue & Sync Demonstration Workspace (Batch 3 Parts B, C, D).
+    Runs hackathon-grade local persistence via browser localStorage:
+    - Simulated Offline / Online Mode Toggle
+    - Offline queueing with temporary local ID (OFFLINE-TMP-...)
+    - Zero server-side Application created while offline
+    - Survives browser page reload
+    - Server synchronization on reconnection via existing Application submission service
+    - Idempotency & duplicate protection
+    - Human-controlled conflict resolution (NO silent overwrites)
+    """
+    return render(request, 'cases/offline_queue.html', {
+        'user_role': get_user_role(request.user) or 'citizen',
+    })
+
+
+@login_required
+def offline_sync_api(request):
+    """
+    Server-side Synchronization Endpoint for Offline Queue (POST).
+    Receives locally queued item data.
+    Validates idempotency, field validity, and conflicts.
+    Submits through submit_application/submit_marma_intake service.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'status': 'failed', 'error': 'POST method required.'}, status=405)
+        
+    try:
+        if request.content_type == 'application/json':
+            payload = json.loads(request.body.decode('utf-8'))
+        else:
+            payload = request.POST.dict()
+    except Exception as e:
+        return JsonResponse({'status': 'failed', 'error': f'Invalid request data: {str(e)}'}, status=400)
+        
+    item_data = payload.get('item', payload)
+    simulate_conflict = bool(payload.get('simulate_conflict') or item_data.get('simulate_conflict'))
+    
+    result = process_offline_sync(
+        item_data=item_data,
+        user=request.user,
+        channel=item_data.get('preferred_channel', Application.CHANNEL_UDC),
+        simulate_conflict=simulate_conflict
+    )
+    
+    return JsonResponse(result)
+
+
+@login_required
+def offline_conflict_resolve_api(request):
+    """
+    Server-side Conflict Resolution Endpoint (POST).
+    Enforces NO SILENT OVERWRITE:
+    - keep_local
+    - keep_server
+    - review_edit
+    Protected against IDOR: checks user authorization.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'status': 'failed', 'error': 'POST method required.'}, status=405)
+        
+    try:
+        if request.content_type == 'application/json':
+            payload = json.loads(request.body.decode('utf-8'))
+        else:
+            payload = request.POST.dict()
+    except Exception as e:
+        return JsonResponse({'status': 'failed', 'error': f'Invalid request data: {str(e)}'}, status=400)
+        
+    temp_id = payload.get('temp_id', '')
+    resolution_choice = payload.get('resolution_choice', '')
+    server_app_id = payload.get('server_app_id')
+    local_data = payload.get('local_data')
+    edited_data = payload.get('edited_data')
+    
+    # IDOR Security Check:
+    # If resolving against existing server_app_id, verify applicant ownership or staff role
+    if server_app_id:
+        server_app = get_object_or_404(Application, application_id=server_app_id)
+        is_staff = has_role(request.user, [
+            UserProfile.ROLE_DLAO_OFFICER,
+            UserProfile.ROLE_DLAO_SUPPORT_STAFF,
+            UserProfile.ROLE_UDC_OPERATOR,
+            UserProfile.ROLE_ADMIN
+        ])
+        is_owner = (server_app.applicant_user and server_app.applicant_user == request.user)
+        if not (is_staff or is_owner):
+            return JsonResponse({'status': 'failed', 'error': 'Unauthorized: You cannot resolve conflict for another user\'s application.'}, status=403)
+            
+    try:
+        app = resolve_offline_conflict(
+            temp_id=temp_id,
+            resolution_choice=resolution_choice,
+            user=request.user,
+            server_app_id=server_app_id,
+            local_data=local_data,
+            edited_data=edited_data
+        )
+        return JsonResponse({
+            'status': 'resolved',
+            'temp_id': temp_id,
+            'resolution_choice': resolution_choice,
+            'application_id': app.application_id,
+            'message': f"Conflict resolved successfully using '{resolution_choice}'."
+        })
+    except (ValidationError, PermissionDenied) as e:
+        return JsonResponse({'status': 'failed', 'error': str(e)}, status=400)
+
 
 

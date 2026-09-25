@@ -60,6 +60,63 @@
     </div>
   {% endif %}
 
+  <!-- Linguistic Provenance Chain (Batch 3 Part A) -->
+  {% if application.original_statement or application.translated_statement %}
+    <div class="card" style="border-top: 4px solid #059669; background-color: #f0fdf4; margin-bottom: 1.5rem;">
+      <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+        <h3 class="card-title" style="color: #065f46; margin: 0;">
+          🗣️ {% tr "Linguistic Provenance Chain" "ভাষাগত উৎসের ধারাবাহিকতা" %}
+        </h3>
+        <span class="badge" style="background-color: #d1fae5; color: #065f46; border: 1px solid #6ee7b7;">
+          {% tr "Indigenous Language Intake" "আদিবাসী মাতৃভাষা আবেদন" %}
+        </span>
+      </div>
+
+      <div style="font-size: 0.88rem; color: #047857; margin-bottom: 1rem;">
+        {% tr "Preserving what the applicant originally said, what was translated, and what was typed into the record." "আবেদনকারী মারমা ভাষায় যা বলেছেন, অনুবাদক যা অনুবাদ করেছেন এবং সিস্টেমে যা টাইপ করা হয়েছে তা সুনির্দিষ্টভাবে চিহ্নিত।" %}
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+        <!-- Step 1: Said -->
+        <div style="background-color: white; border: 1px solid #86efac; border-radius: var(--radius-md); padding: 1rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem; flex-wrap: wrap;">
+            <strong style="color: #166534;">🗣️ {% tr "Marma Said (Original Oral Statement)" "মারমা ভাষায় বলা (আসল বক্তব্য)" %}</strong>
+            <span class="badge" style="background-color: #dcfce7; color: #15803d;">{% tr "Provenance: Applicant-Confirmed" "উৎস: আবেদনকারী-অনুমোদিত" %}</span>
+          </div>
+          <p style="margin: 0; font-size: 0.98rem; font-weight: 600; color: #14532d;">"{{ application.original_statement }}"</p>
+          <small style="color: #15803d; display: block; margin-top: 0.35rem;">
+            {% tr "Directly attributed to citizen applicant." "আবেদনকারীর নিজস্ব সরাসরি বক্তব্য।" %}
+          </small>
+        </div>
+
+        <div style="text-align: center; color: #15803d; font-size: 1.2rem; margin: -0.25rem 0;">↓</div>
+
+        <!-- Step 2: Translated -->
+        <div style="background-color: white; border: 1px solid #93c5fd; border-radius: var(--radius-md); padding: 1rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem; flex-wrap: wrap;">
+            <strong style="color: #1e40af;">🔄 {% tr "Translated (Intermediary Translation)" "অনুবাদ (সহকারী/অনুবাদক অনূদিত)" %}</strong>
+            <span class="badge" style="background-color: #dbeafe; color: #1e40af;">{% tr "Provenance: Intermediary-Translated" "উৎস: সহকারী-অনূদিত" %}</span>
+          </div>
+          <p style="margin: 0; font-size: 0.95rem; color: #1e3a8a;">"{{ application.translated_statement }}"</p>
+          <small style="color: #64748b; display: block; margin-top: 0.35rem;">
+            {% tr "Note: Intermediary translation is attributed to the operator and NOT falsely labeled as applicant-originated." "নোট: অনূদিত বক্তব্য সহকারী/অনুবাদকের সৃষ্টি এবং আবেদনকারীর নিজস্ব বক্তব্য হিসেবে মিথ্যা চিহ্নিত নয়।" %}
+          </small>
+        </div>
+
+        <div style="text-align: center; color: #1e40af; font-size: 1.2rem; margin: -0.25rem 0;">↓</div>
+
+        <!-- Step 3: Typed -->
+        <div style="background-color: white; border: 1px solid #fde68a; border-radius: var(--radius-md); padding: 1rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem; flex-wrap: wrap;">
+            <strong style="color: #92400e;">📝 {% tr "Typed (Structured Application Data)" "টাইপ করা (কাঠামোগত আইনি তথ্য)" %}</strong>
+            <span class="badge" style="background-color: #fef3c7; color: #92400e;">{% tr "Provenance: Staff-Entered" "উৎস: অপারেটর-টাইপকৃত" %}</span>
+          </div>
+          <p style="margin: 0; font-size: 0.95rem; color: #78350f;"><strong>{{ application.legal_problem }}</strong></p>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
   <!-- Application Intake Information Table -->
   <div class="card">
     <div class="card-header">

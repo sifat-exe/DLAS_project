@@ -108,3 +108,105 @@ class UDCAssistedApplicationForm(CitizenApplicationForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['preferred_channel'].initial = Application.CHANNEL_UDC
+
+
+class MarmaAssistedIntakeForm(forms.Form):
+    """
+    Intake form for Marma indigenous language assisted intake (Batch 3 Part A).
+    Preserves:
+    1. Marma Said (original_statement in Marma language)
+    2. Intermediary Translation (translated_statement in Bangla/English)
+    3. Typed application data (legal_problem, incident_description)
+    4. Explicit verification confirmations before submission.
+    """
+    name = forms.CharField(
+        max_length=255,
+        required=True,
+        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'আবেদনকারীর নাম / Applicant Full Name'})
+    )
+    phone = forms.CharField(
+        max_length=32,
+        required=True,
+        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': '01XXXXXXXXX'})
+    )
+    address = forms.CharField(
+        required=True,
+        widget=forms.Textarea(attrs={'class': 'form-textarea', 'rows': 2, 'placeholder': 'ঠিকানা (মৌজা, পাড়া, ইউনিয়ন, উপজেলা, পার্বত্য জেলা) / Address'})
+    )
+    statement_language = forms.CharField(
+        max_length=32,
+        initial='marma',
+        widget=forms.TextInput(attrs={'class': 'form-input', 'readonly': 'readonly'})
+    )
+    # Layer 1: Marma Said
+    original_statement = forms.CharField(
+        required=True,
+        widget=forms.Textarea(attrs={
+            'class': 'form-textarea',
+            'rows': 3,
+            'placeholder': 'মারমা ভাষায় আবেদনকারী যা বলেছেন (আসল বক্তব্য) / Original statement as spoken by the applicant in Marma'
+        })
+    )
+    # Layer 2: Intermediary Translation
+    translated_statement = forms.CharField(
+        required=True,
+        widget=forms.Textarea(attrs={
+            'class': 'form-textarea',
+            'rows': 3,
+            'placeholder': 'সহকারী/অনুবাদকের করা বাংলা বা ইংরেজি অনুবাদ / Translation into Bangla/English by intermediary'
+        })
+    )
+    # Layer 3: Typed Application Data
+    legal_problem = forms.CharField(
+        required=True,
+        widget=forms.Textarea(attrs={
+            'class': 'form-textarea',
+            'rows': 2,
+            'placeholder': 'আইনি সমস্যার সারসংক্ষেপ (টাইপকৃত) / Structured Legal Problem'
+        })
+    )
+    incident_description = forms.CharField(
+        required=True,
+        widget=forms.Textarea(attrs={
+            'class': 'form-textarea',
+            'rows': 4,
+            'placeholder': 'ঘটনার সুনির্দিষ্ট আইনি বিবরণ (টাইপকৃত) / Structured Incident Description'
+        })
+    )
+    safe_contact_number = forms.CharField(
+        max_length=32,
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'বিকল্প নিরাপদ ফোন (ঐচ্ছিক)'})
+    )
+    safe_contact_time = forms.CharField(
+        max_length=128,
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'নিরাপদ সময় (ঐচ্ছিক)'})
+    )
+    nid_number = forms.CharField(
+        max_length=32,
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'এনআইডি নম্বর (ঐচ্ছিক)'})
+    )
+    verify_translation = forms.BooleanField(
+        required=True,
+        widget=forms.CheckboxInput(attrs={'class': 'form-checkbox'}),
+        error_messages={'required': 'You must verify that the translation accurately represents what was said / অনুবাদটি আসল বক্তব্যের সঠিক প্রতিফলন তা যাচাই করা বাধ্যতামূলক।'}
+    )
+    verify_typed_data = forms.BooleanField(
+        required=True,
+        widget=forms.CheckboxInput(attrs={'class': 'form-checkbox'}),
+        error_messages={'required': 'You must verify that the typed structured data accurately represents the translation / টাইপকৃত তথ্য অনুবাদের সাথে সামঞ্জস্যপূর্ণ তা যাচাই করা বাধ্যতামূলক।'}
+    )
+    applicant_consent = forms.BooleanField(
+        required=True,
+        widget=forms.CheckboxInput(attrs={'class': 'form-checkbox'}),
+        error_messages={'required': 'Applicant consent and review read-back are mandatory / আবেদনকারীর সম্মতি ও পাঠ করে শোনানো বাধ্যতামূলক।'}
+    )
+
+    def clean_phone(self):
+        phone = self.cleaned_data.get('phone', '').strip()
+        digits = re.sub(r'[^\d+]', '', phone)
+        if len(digits) < 6:
+            raise ValidationError("Please provide a valid contact phone number / অনুগ্রহ করে একটি সঠিক ফোন নম্বর লিখুন।")
+        return phone

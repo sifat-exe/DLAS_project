@@ -25,4 +25,10 @@ urlpatterns = [
     path('tasks/<int:task_id>/voice/', views.voice_task_view, name='voice_task'),
     path('tasks/<int:task_id>/voice/execute/', views.voice_task_execute, name='voice_task_execute'),
     path('tasks/ripon-demo/', views.ripon_voice_task_demo, name='ripon_voice_task_demo'),
+
+    # Batch 3: Marma Provenance & True Offline Queue/Sync
+    path('marma-intake/', views.marma_intake_view, name='marma_intake'),
+    path('offline-queue/', views.offline_queue_view, name='offline_queue'),
+    path('offline/sync/', views.offline_sync_api, name='offline_sync'),
+    path('offline/resolve-conflict/', views.offline_conflict_resolve_api, name='offline_conflict_resolve'),
 ]

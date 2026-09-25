@@ -70,6 +70,12 @@ class Application(models.Model):
         default=NID_STATUS_NOT_VERIFIED
     )
     status = models.CharField(max_length=32, choices=STATUS_CHOICES, default=STATUS_SUBMITTED)
+    # Marma & Linguistic Provenance (Batch 3 Part A)
+    original_statement = models.TextField(blank=True, default='')
+    translated_statement = models.TextField(blank=True, default='')
+    statement_language = models.CharField(max_length=32, blank=True, default='')
+    # Offline sync idempotency & duplicate protection (Batch 3 Part B)
+    idempotency_token = models.CharField(max_length=128, blank=True, default='', db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

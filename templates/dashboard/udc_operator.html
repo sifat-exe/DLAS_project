@@ -43,9 +43,17 @@
   <p style="color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 1.25rem;">
     {% tr "Facilitate a new citizen application. The intake process distinguishes what the citizen stated, what was translated, and what was transcribed." "নতুন আবেদন গ্রহণ করুন। প্রক্রিয়াটি নাগরিকের বক্তব্য, অনুবাদ এবং টাইপকৃত তথ্যের উৎস আলাদাভাবে সংরক্ষণ করে।" %}
   </p>
-  <a href="{% url 'cases:udc_intake' %}" class="btn btn-primary">
-    + {% tr "Begin Assisted Intake Form (Consent Required)" "সহায়তাকৃত আবেদন শুরু করুন (সম্মতি আবশ্যক)" %}
-  </a>
+  <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+    <a href="{% url 'cases:udc_intake' %}" class="btn btn-primary">
+      + {% tr "Begin Standard Assisted Intake" "সাধারণ সহায়তাকৃত আবেদন" %}
+    </a>
+    <a href="{% url 'cases:marma_intake' %}" class="btn btn-secondary">
+      🗣️ {% tr "Marma Indigenous Language Intake" "মারমা ভাষায় সহায়তাকৃত আবেদন" %}
+    </a>
+    <a href="{% url 'cases:offline_queue' %}" class="btn btn-secondary">
+      🔌 {% tr "Offline Queue & Sync" "অফলাইন কিউ ও সিঙ্ক" %}
+    </a>
+  </div>
 </div>
 
 <!-- Empty Session State -->
