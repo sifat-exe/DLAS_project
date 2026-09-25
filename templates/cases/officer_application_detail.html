@@ -1,0 +1,211 @@
+{% extends 'base.html' %}
+{% load dlas_tags %}
+
+{% block title %}
+  {% tr "Officer Review - Application " "কর্মকর্তা পর্যালোচনা - আবেদন " %}{{ application.application_id }}
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 900px; margin: 1rem auto;">
+  <div class="dashboard-header">
+    <div>
+      <h2>{% tr "Legal Aid Intake Review" "আইনি সহায়তা আবেদন পর্যালোচনা" %}</h2>
+      <p style="color: var(--text-muted); font-size: 0.9rem;">
+        {% tr "Review applicant details and determine formal case acceptance or rejection." "আবেদনের তথ্য পর্যালোচনা করুন এবং আনুষ্ঠানিকভাবে গ্রহণ বা বাতিলের সিদ্ধান্ত গ্রহণ করুন।" %}
+      </p>
+    </div>
+    <div>
+      <a href="{% url 'dashboard:officer' %}" class="btn btn-secondary btn-sm">
+        ← {% tr "Back to Officer Queue" "কর্মকর্তার কিউ-তে ফিরুন" %}
+      </a>
+    </div>
+  </div>
+
+  <!-- Header Card -->
+  <div class="card" style="border-top: 4px solid var(--info-color);">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+      <div>
+        <span style="font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">
+          {% tr "Application ID" "অ্যাপ্লিকেশন আইডি" %}
+        </span>
+        <div style="font-size: 1.85rem; font-weight: 800; color: var(--secondary-color);">
+          {{ application.application_id }}
+        </div>
+        <span class="form-hint">
+          {% tr "Submitted on:" "জমাদানের তারিখ:" %} {{ application.created_at|date:"d M Y, h:i A" }} via {{ application.get_preferred_channel_display }}
+        </span>
+      </div>
+
+      <div>
+        <span style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">
+          {% tr "Application Status" "আবেদনের অবস্থা" %}
+        </span>
+        <span class="badge badge-submitted" style="font-size: 0.95rem; padding: 0.35rem 0.85rem;">
+          {{ application.get_status_display }}
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Safe Contact Notice if provided -->
+  {% if application.safe_contact_number or application.safe_contact_time %}
+    <div class="safe-contact-box">
+      <strong>{% tr "Applicant Designated Safe Contact:" "আবেদনকারী কর্তৃক নির্দেশিত নিরাপদ যোগাযোগ:" %}</strong>
+      {% if application.safe_contact_number %}
+        {% tr "Safe Number:" "নিরাপদ নম্বর:" %} <strong>{{ application.safe_contact_number }}</strong> | 
+      {% endif %}
+      {% if application.safe_contact_time %}
+        {% tr "Permitted Contact Hours:" "অনুমোদিত সময়:" %} <strong>{{ application.safe_contact_time }}</strong>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  <!-- Application Intake Information Table -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">{% tr "Intake Details" "আবেদনপত্রের বিবরণ" %}</h3>
+    </div>
+    <div class="table-container">
+      <table class="table">
+        <tbody>
+          <tr>
+            <th style="width: 30%;">{% tr "Applicant Name" "আবেদনকারীর নাম" %}</th>
+            <td>{{ application.name }}</td>
+          </tr>
+          <tr>
+            <th>{% tr "Contact Phone" "মোবাইল ফোন" %}</th>
+            <td>{{ application.phone }}</td>
+          </tr>
+          <tr>
+            <th>{% tr "Address" "ঠিকানা" %}</th>
+            <td>{{ application.address }}</td>
+          </tr>
+          <tr>
+            <th>{% tr "Legal Problem" "আইনি সমস্যা" %}</th>
+            <td><strong>{{ application.legal_problem }}</strong></td>
+          </tr>
+          <tr>
+            <th>{% tr "Incident Description" "ঘটনার পূর্ণ বিবরণ" %}</th>
+            <td style="white-space: pre-wrap;">{{ application.incident_description }}</td>
+          </tr>
+          <tr>
+            <th>{% tr "Language Preference" "ভাষার অগ্রাধিকার" %}</th>
+            <td>{{ application.language|upper }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Officer Consequential Decision Panel (PRD Section 2.4 & Architecture Section 4) -->
+  {% if application.status != 'ACCEPTED' and application.status != 'REJECTED' %}
+    <div class="grid-2">
+      <!-- Accept Application Form -->
+      <div class="card" style="border-top: 3px solid var(--success-color);">
+        <div class="card-header">
+          <h3 class="card-title" style="color: var(--success-color);">
+            ✓ {% tr "Accept Legal-Aid Application" "আইনি সহায়তা আবেদন গ্রহণ করুন" %}
+          </h3>
+          <span class="badge badge-accepted">Case ID Generation</span>
+        </div>
+        <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          {% tr "Accepting this intake generates a formal Case ID, creates an immutable CaseRecord, and marks the application as accepted." "আবেদনটি গ্রহণ করলে একটি আনুষ্ঠানিক কেস আইডি তৈরি হবে এবং অপরিবর্তনীয় মামলা রেকর্ড প্রস্তুত হবে।" %}
+        </p>
+
+        <form method="POST" action="{% url 'cases:officer_application_detail' application.application_id %}">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="accept">
+
+          <div class="form-group">
+            <label class="form-label" for="priority">{% tr "Initial Case Priority *" "মামলার প্রাথমিক অগ্রাধিকার *" %}</label>
+            <select name="priority" id="priority" class="form-select">
+              {% for p_code, p_label in priority_choices %}
+                <option value="{{ p_code }}" {% if p_code == 'MEDIUM' %}selected{% endif %}>{{ p_label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="width: 100%;">
+            {% tr "Confirm Accept & Issue Case ID" "আবেদন গ্রহণ করুন ও কেস আইডি প্রস্তুত করুন" %}
+          </button>
+        </form>
+      </div>
+
+      <!-- Reject Application Form -->
+      <div class="card" style="border-top: 3px solid var(--danger-color);">
+        <div class="card-header">
+          <h3 class="card-title" style="color: var(--danger-color);">
+            ✕ {% tr "Reject Application" "আবেদন বাতিল / প্রত্যাখ্যান" %}
+          </h3>
+          <span class="badge badge-draft">No Case ID</span>
+        </div>
+        <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          {% tr "If the matter does not meet legal-aid qualification criteria, record the formal rejection reason." "যদি বিষয়টি আইনি সহায়তা প্রাপ্তির মানদণ্ড পূরণ না করে, তবে আনুষ্ঠানিক কারণ উল্লেখ করে বাতিল করুন।" %}
+        </p>
+
+        <form method="POST" action="{% url 'cases:officer_application_detail' application.application_id %}">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="reject">
+
+          <div class="form-group">
+            <label class="form-label" for="reason">{% tr "Formal Rejection Reason *" "প্রত্যাখ্যানের লিখিত কারণ *" %}</label>
+            <textarea name="reason" id="reason" class="form-textarea" rows="2" placeholder="e.g. Income exceeds eligibility ceiling / Non-justiciable matter" required></textarea>
+          </div>
+
+          <button type="submit" class="btn btn-danger" style="width: 100%;">
+            {% tr "Confirm Rejection" "আবেদন বাতিল নিশ্চিত করুন" %}
+          </button>
+        </form>
+      </div>
+    </div>
+  {% else %}
+    <div class="card">
+      <h4>
+        {% tr "Decision Finalized" "সিদ্ধান্ত গৃহীত হয়েছে" %}: 
+        <span class="badge {% if application.status == 'ACCEPTED' %}badge-accepted{% else %}badge-closed{% endif %}">
+          {{ application.get_status_display }}
+        </span>
+      </h4>
+      {% if application.case_record %}
+        <p style="margin-top: 0.5rem;">
+          <a href="{% url 'cases:officer_case_detail' application.case_record.case_id %}" class="btn btn-primary btn-sm">
+            {% tr "Open Case Workspace: " "মামলা কর্মক্ষেত্র খুলুন: " %} {{ application.case_record.case_id }} →
+          </a>
+        </p>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  <!-- Event History -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">{% tr "Application Audit Trail" "আবেদনের অডিট বিবরণ" %}</h3>
+      <span class="badge badge-accepted">CaseEvent</span>
+    </div>
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>{% tr "Timestamp" "তারিখ ও সময়" %}</th>
+            <th>{% tr "Action" "পদক্ষেপ" %}</th>
+            <th>{% tr "Actor" "সম্পাদনকারী" %}</th>
+            <th>{% tr "Provenance" "উৎস" %}</th>
+            <th>{% tr "Description" "বিবরণ" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for event in events %}
+            <tr>
+              <td style="white-space: nowrap;">{{ event.created_at|date:"d M Y, H:i" }}</td>
+              <td><span class="badge badge-submitted">{{ event.action }}</span></td>
+              <td>{{ event.actor.username|default:"System" }} ({{ event.actor_role }})</td>
+              <td>{{ event.get_provenance_display }}</td>
+              <td>{{ event.description }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

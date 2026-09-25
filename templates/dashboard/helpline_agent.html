@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% load dlas_tags %}
+
+{% block title %}
+  {% tr "Helpline Agent (16699) - DLAS" "হেল্পলাইন এজেন্ট (১৬৬৯৯) - ডিএলএএস" %}
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+  <div>
+    <h2>{% tr "Helpline Agent Console (16699)" "জাতীয় হেল্পলাইন কনসোল (১৬৬৯৯)" %}</h2>
+    <p style="color: var(--text-muted); font-size: 0.9rem;">
+      {% tr "Telephonic citizen intake, safe callback window verification, and rapid status lookups." "টেলিফোনিক আবেদন গ্রহণ, নিরাপদ যোগাযোগের সময় যাচাই ও তাৎক্ষণিক অবস্থা অনুসন্ধান।" %}
+    </p>
+  </div>
+  <div style="display: flex; gap: 0.5rem; align-items: center;">
+    <span class="badge badge-simulated">{% tr "16699 SIMULATED" "১৬৬৯৯ সিমুলেটেড" %}</span>
+    <span class="role-pill">{% tr "Role: Helpline Agent" "রোল: হেল্পলাইন এজেন্ট" %}</span>
+  </div>
+</div>
+
+<!-- Simulated Notice -->
+<div class="proto-banner" style="border-radius: var(--radius-md); margin-bottom: 1.5rem; text-align: left;">
+  <strong>{% tr "Architecture Mock Notice:" "আর্কিটেকচার মক নোটিশ:" %}</strong>
+  {% tr "Per PRD Out of Scope specifications, real telecommunication telephony (IVR/PSTN/16699) is replaced with an internal MockIVRService clearly labelled SIMULATED." "পিআরডি নির্দেশনা অনুযায়ী প্রকৃত টেলিকম গেটওয়ের পরিবর্তে অভ্যন্তরীণ MockIVRService দ্বারা এটি সিমুলেটেড হিসেবে প্রদর্শিত।" %}
+</div>
+
+<div class="grid-2" style="margin-bottom: 1.5rem;">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">{% tr "Simulated Call Intake" "কল গ্রহণ ও আবেদন ড্রাফট" %}</h3>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="caller-phone">{% tr "Caller Phone Number" "কলার মোবাইল নম্বর" %}</label>
+      <input type="text" id="caller-phone" class="form-input" placeholder="01XXXXXXXXX" disabled>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="safe-time">{% tr "Designated Safe Contact Time" "নির্ধারিত নিরাপদ যোগাযোগের সময়" %}</label>
+      <input type="text" id="safe-time" class="form-input" placeholder="e.g. 10:00 AM - 1:00 PM (Weekdays)" disabled>
+    </div>
+    <button class="btn btn-primary btn-sm" disabled>
+      {% tr "Initiate Phone Intake Ticket" "টেলিফোন আবেদন শুরু করুন" %}
+    </button>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">{% tr "Rapid Status Lookup" "তাৎক্ষণিক অবস্থা অনুসন্ধান" %}</h3>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="lookup-id">{% tr "Application ID or Phone" "অ্যাপ্লিকেশন আইডি বা ফোন" %}</label>
+      <input type="text" id="lookup-id" class="form-input" placeholder="APP-XXXX or Phone" disabled>
+    </div>
+    <button class="btn btn-secondary btn-sm" disabled>
+      {% tr "Verify Status for Caller" "অবস্থা যাচাই করুন" %}
+    </button>
+  </div>
+</div>
+{% endblock %}

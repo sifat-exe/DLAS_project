@@ -1,0 +1,254 @@
+{% extends 'base.html' %}
+{% load dlas_tags %}
+
+{% block title %}
+  {% tr "DLAO Officer Dashboard - DLAS" "ডিএলএও কর্মকর্তা ড্যাশবোর্ড - ডিএলএএস" %}
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+  <div>
+    <h2>{% tr "District Legal Aid Officer (DLAO) Workspace" "জেলা লিগ্যাল এইড অফিসার (ডিএলএও) কর্মক্ষেত্র" %}</h2>
+    <p style="color: var(--text-muted); font-size: 0.9rem;">
+      {% tr "Intake review, case acceptance, priority management, lawyer assignments & referrals." "আবেদন পর্যালোচনা, মামলা গ্রহণ, অগ্রাধিকার নির্ধারণ, আইনজীবী নিয়োগ ও রেফারেল।" %}
+    </p>
+  </div>
+  <div style="display: flex; gap: 0.5rem; align-items: center;">
+    <span class="role-pill">{% tr "Role: DLAO Officer" "রোল: ডিএলএও কর্মকর্তা" %}</span>
+  </div>
+</div>
+
+<!-- Queue Categories (PRD Section 2.4 / 17) -->
+<div class="grid-3" style="margin-bottom: 1.5rem;">
+  <div class="card" style="border-top: 3px solid var(--info-color);">
+    <div class="card-header">
+      <span class="card-title">{% tr "New Applications" "নতুন আবেদন" %}</span>
+      <span class="badge badge-submitted">{{ new_count|default:0 }}</span>
+    </div>
+    <p class="form-hint">{% tr "Awaiting intake review & eligibility check" "প্রাথমিক পর্যালোচনা ও যোগ্যতা যাচাইয়ের অপেক্ষায়" %}</p>
+  </div>
+
+  <div class="card" style="border-top: 3px solid var(--warning-color);">
+    <div class="card-header">
+      <span class="card-title">{% tr "Pending / Under Review" "বিবেচনাধীন" %}</span>
+      <span class="badge badge-under-review">{{ pending_count|default:0 }}</span>
+    </div>
+    <p class="form-hint">{% tr "Clarification or missing documents requested" "অতিরিক্ত তথ্য বা কাগজপত্রের অনুরোধ করা হয়েছে" %}</p>
+  </div>
+
+  <div class="card" style="border-top: 3px solid var(--success-color);">
+    <div class="card-header">
+      <span class="card-title">{% tr "Accepted Cases" "গৃহীত মামলা" %}</span>
+      <span class="badge badge-accepted">{{ accepted_count|default:0 }}</span>
+    </div>
+    <p class="form-hint">{% tr "Case ID generated, awaiting lawyer assignment" "কেস আইডি প্রস্তুত, আইনজীবী বরাদ্দের অপেক্ষায়" %}</p>
+  </div>
+
+  <div class="card" style="border-top: 3px solid var(--secondary-color);">
+    <div class="card-header">
+      <span class="card-title">{% tr "In Progress" "চলমান মামলা" %}</span>
+      <span class="badge badge-in-progress">{{ in_progress_count|default:0 }}</span>
+    </div>
+    <p class="form-hint">{% tr "Under active legal representation or ADR" "আইনজীবী পরিচালনা বা মধ্যস্থতায় সক্রিয়" %}</p>
+  </div>
+
+  <div class="card" style="border-top: 3px solid var(--danger-color);">
+    <div class="card-header">
+      <span class="card-title">{% tr "Overdue Tasks" "সময়োত্তীর্ণ কার্যক্রম" %}</span>
+      <span class="badge" style="background-color: var(--danger-bg); color: var(--danger-color);">{{ overdue_count|default:0 }}</span>
+    </div>
+    <p class="form-hint">{% tr "Referrals or lawyer reports past deadline" "সময়সীমা অতিক্রম করা রেফারেল বা আইনজীবী প্রতিবেদন" %}</p>
+  </div>
+
+  <div class="card" style="border-top: 3px solid var(--text-muted);">
+    <div class="card-header">
+      <span class="card-title">{% tr "Closed / Rejected" "নিষ্পত্তিকৃত / বাতিল" %}</span>
+      <span class="badge badge-closed">{{ closed_count|default:0 }}</span>
+    </div>
+    <p class="form-hint">{% tr "Completed cases or rejected applications" "চূড়ান্ত নিষ্পত্তি বা বাতিলকৃত আবেদন" %}</p>
+  </div>
+</div>
+
+<!-- Section 1: New Intake Applications Queue -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">{% tr "1. New Legal-Aid Applications (Awaiting Decision)" "১. নতুন আইনি সহায়তা আবেদন (সিদ্ধান্তের অপেক্ষায়)" %}</h3>
+    <span class="badge badge-submitted">{{ new_count|default:0 }}</span>
+  </div>
+
+  {% if new_apps %}
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>{% tr "Application ID" "অ্যাপ্লিকেশন আইডি" %}</th>
+            <th>{% tr "Applicant" "আবেদনকারী" %}</th>
+            <th>{% tr "Legal Problem" "আইনি সমস্যা" %}</th>
+            <th>{% tr "Channel" "মাধ্যম" %}</th>
+            <th>{% tr "Safe Contact" "নিরাপদ যোগাযোগ" %}</th>
+            <th>{% tr "Submitted On" "আবেদনের তারিখ" %}</th>
+            <th>{% tr "Officer Action" "কর্মকর্তার পদক্ষেপ" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for app in new_apps %}
+            <tr>
+              <td><strong>{{ app.application_id }}</strong></td>
+              <td>{{ app.name }}<br><small style="color: var(--text-muted);">{{ app.phone }}</small></td>
+              <td>{{ app.legal_problem|truncatewords:8 }}</td>
+              <td><span class="badge badge-draft">{{ app.get_preferred_channel_display }}</span></td>
+              <td>
+                {% if app.safe_contact_number %}
+                  <span style="color: #9a3412;">{{ app.safe_contact_number }}</span><br>
+                  <small>{{ app.safe_contact_time }}</small>
+                {% else %}
+                  <span style="color: var(--text-muted);">Standard</span>
+                {% endif %}
+              </td>
+              <td>{{ app.created_at|date:"d M Y, h:i A" }}</td>
+              <td>
+                <a href="{% url 'cases:officer_application_detail' app.application_id %}" class="btn btn-primary btn-sm">
+                  {% tr "Review & Decide →" "পর্যালোচনা ও সিদ্ধান্ত →" %}
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p style="color: var(--text-muted); font-size: 0.9rem; padding: 1rem 0;">
+      {% tr "No new intake applications awaiting officer review." "পর্যালোচনার অপেক্ষায় কোনো নতুন আবেদন নেই।" %}
+    </p>
+  {% endif %}
+</div>
+
+<!-- Section 2: Active Case Records (Accepted / In Progress / Mediation / Referred) -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">{% tr "2. Active Case Records" "২. সক্রিয় মামলাসমূহ" %}</h3>
+    <span class="badge badge-accepted">{{ accepted_count|add:in_progress_count }}</span>
+  </div>
+
+  {% if accepted_cases or in_progress_cases %}
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>{% tr "Case ID" "কেস আইডি" %}</th>
+            <th>{% tr "Application ID" "অ্যাপ্লিকেশন আইডি" %}</th>
+            <th>{% tr "Applicant" "নাগরিক" %}</th>
+            <th>{% tr "Priority" "অগ্রাধিকার" %}</th>
+            <th>{% tr "Status" "অবস্থা" %}</th>
+            <th>{% tr "Assigned Lawyer" "দায়িত্বপ্রাপ্ত আইনজীবী" %}</th>
+            <th>{% tr "Accepted On" "গ্রহণের তারিখ" %}</th>
+            <th>{% tr "Action" "পদক্ষেপ" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for case in accepted_cases %}
+            <tr>
+              <td><strong style="color: var(--primary-color);">{{ case.case_id }}</strong></td>
+              <td>{{ case.application.application_id }}</td>
+              <td>{{ case.application.name }}</td>
+              <td><span class="badge badge-under-review">{{ case.get_priority_display }}</span></td>
+              <td><span class="badge badge-accepted">{{ case.get_status_display }}</span></td>
+              <td>
+                {% if case.assigned_lawyer %}
+                  {{ case.assigned_lawyer.get_full_name|default:case.assigned_lawyer.username }}
+                {% else %}
+                  <span style="color: #b45309; font-weight: 600;">{% tr "Awaiting Assignment" "বরাদ্দ অপেক্ষমাণ" %}</span>
+                {% endif %}
+              </td>
+              <td>{{ case.accepted_at|date:"d M Y" }}</td>
+              <td>
+                <a href="{% url 'cases:officer_case_detail' case.case_id %}" class="btn btn-secondary btn-sm">
+                  {% tr "Manage Case →" "মামলা পরিচালনা →" %}
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+          {% for case in in_progress_cases %}
+            <tr>
+              <td><strong style="color: var(--primary-color);">{{ case.case_id }}</strong></td>
+              <td>{{ case.application.application_id }}</td>
+              <td>{{ case.application.name }}</td>
+              <td><span class="badge badge-under-review">{{ case.get_priority_display }}</span></td>
+              <td><span class="badge badge-in-progress">{{ case.get_status_display }}</span></td>
+              <td>
+                {% if case.assigned_lawyer %}
+                  {{ case.assigned_lawyer.get_full_name|default:case.assigned_lawyer.username }}
+                {% else %}
+                  <span style="color: var(--text-muted);">None</span>
+                {% endif %}
+              </td>
+              <td>{{ case.accepted_at|date:"d M Y" }}</td>
+              <td>
+                <a href="{% url 'cases:officer_case_detail' case.case_id %}" class="btn btn-secondary btn-sm">
+                  {% tr "Manage Case →" "মামলা পরিচালনা →" %}
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p style="color: var(--text-muted); font-size: 0.9rem; padding: 1rem 0;">
+      {% tr "No active case records currently in progress." "বর্তমানে কোনো চলমান সক্রিয় মামলা নেই।" %}
+    </p>
+  {% endif %}
+</div>
+
+<!-- Section 3: Overdue Items & Escalations -->
+{% if overdue_count > 0 %}
+  <div class="card" style="border-left: 4px solid var(--danger-color);">
+    <div class="card-header">
+      <h3 class="card-title" style="color: var(--danger-color);">
+        ⚠️ {% tr "3. Overdue Tasks & Referral Escalations" "৩. সময়োত্তীর্ণ কাজ ও রেফারেল পর্যালোচনা" %}
+      </h3>
+      <span class="badge" style="background-color: var(--danger-bg); color: var(--danger-color);">{{ overdue_count }}</span>
+    </div>
+    <ul>
+      {% for ref in overdue_referrals %}
+        <li style="margin-bottom: 0.5rem; font-size: 0.9rem;">
+          <strong>{{ ref.case.case_id }}</strong>: Referral to <strong>{{ ref.destination }}</strong> (Status: {{ ref.get_status_display }}, Returned Count: {{ ref.returned_count }}).
+          <a href="{% url 'referrals:referral_detail' ref.id %}" class="btn btn-secondary btn-sm" style="margin-left: 0.5rem;">
+            {% tr "Inspect Referral" "রেফারেল দেখুন" %}
+          </a>
+        </li>
+      {% endfor %}
+      {% for t in overdue_tasks %}
+        <li style="margin-bottom: 0.5rem; font-size: 0.9rem;">
+          <strong>{{ t.case.case_id }}</strong>: {{ t.title }} (Due: {{ t.due_at|date:"d M Y" }}).
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endif %}
+
+<!-- Empty Queue Fallback if completely clear (PRD Section 4.2 / 291) -->
+{% if new_count == 0 and accepted_count == 0 and in_progress_count == 0 and overdue_count == 0 %}
+  <div class="card">
+    <div class="empty-state">
+      <div class="empty-state-icon">📋</div>
+      <h3>
+        {% tr "No cases currently require your action." "বর্তমানে আপনার পদক্ষেপের জন্য কোনো মামলা অপেক্ষমাণ নেই।" %}
+      </h3>
+      <p style="color: var(--text-muted); font-size: 0.9rem;">
+        {% tr "All submitted legal-aid applications and assigned cases are up to date." "সকল আইনি সহায়তা আবেদন এবং মামলা বর্তমানে হালনাগাদ অবস্থায় রয়েছে।" %}
+      </p>
+    </div>
+  </div>
+{% endif %}
+
+<!-- Consequential Action Protocol Box -->
+<div class="card" style="border-left: 4px solid var(--accent-color);">
+  <h4 style="color: var(--accent-color); margin-bottom: 0.5rem;">
+    {% tr "Authorised Human Authority Principle (Architecture Section 4 & 6)" "অনুমোদিত মানব কর্তৃত্ব নীতিমালা (আর্কিটেকচার বিভাগ ৪ ও ৬)" %}
+  </h4>
+  <p style="font-size: 0.88rem; color: var(--text-secondary);">
+    {% tr "Accepting, rejecting, assigning lawyers, transferring, or closing a case requires explicit human officer confirmation. Every consequential action triggers an append-only CaseEvent record with full audit provenance." "মামলা গ্রহণ, বাতিল, আইনজীবী নিয়োগ, রেফারেল বা সমাপ্তির মতো প্রতিটি চূড়ান্ত সিদ্ধান্ত কেবলমাত্র অনুমোদিত কর্মকর্তার প্রত্যক্ষ অনুমোদন সাপেক্ষ। প্রতিটি পদক্ষেপ অপরিবর্তনীয় CaseEvent লগে তাৎক্ষণিকভাবে সংরক্ষিত হয়।" %}
+  </p>
+</div>
+{% endblock %}

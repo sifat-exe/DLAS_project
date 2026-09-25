@@ -1,0 +1,99 @@
+{% extends 'base.html' %}
+{% load dlas_tags %}
+
+{% block title %}
+  {% tr "Review UDC Intake - DLAS" "ইউডিসি আবেদন পর্যালোচনা - ডিএলএএস" %}
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 850px; margin: 1rem auto;">
+  <div class="dashboard-header">
+    <div>
+      <h2>{% tr "Review UDC Assisted Submission" "ইউডিসি সহায়তাকৃত আবেদন পর্যালোচনা" %}</h2>
+      <p style="color: var(--text-muted); font-size: 0.9rem;">
+        {% tr "Final review with citizen present before generating Application ID." "নাগরিকের উপস্থিতিতে চূড়ান্ত পর্যালোচনা ও অ্যাপ্লিকেশন আইডি তৈরি।" %}
+      </p>
+    </div>
+    <div>
+      <span class="role-pill">{% tr "Read-Back Verified" "পর্যালোচনা পাঠ সম্পন্ন" %}</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">{% tr "Intake Summary for Confirmation" "নিশ্চিতকরণের জন্য আবেদনের বিবরণ" %}</h3>
+      <span class="badge badge-accepted">{% tr "Consent Recorded" "সম্মতি সংরক্ষিত" %}</span>
+    </div>
+
+    <div class="table-container" style="margin-bottom: 1.5rem;">
+      <table class="table">
+        <tbody>
+          <tr>
+            <th style="width: 35%;">{% tr "Citizen Full Name" "নাগরিকের পূর্ণ নাম" %}</th>
+            <td><strong>{{ form_data.name }}</strong></td>
+          </tr>
+          <tr>
+            <th>{% tr "Citizen Mobile" "নাগরিকের মোবাইল নম্বর" %}</th>
+            <td>{{ form_data.phone }}</td>
+          </tr>
+          <tr>
+            <th>{% tr "Present Address" "বর্তমান ঠিকানা" %}</th>
+            <td>{{ form_data.address }}</td>
+          </tr>
+          <tr>
+            <th>{% tr "Legal Problem" "আইনি সমস্যা" %}</th>
+            <td><strong>{{ form_data.legal_problem }}</strong></td>
+          </tr>
+          <tr>
+            <th>{% tr "Incident Description" "ঘটনার বিবরণ" %}</th>
+            <td style="white-space: pre-wrap;">{{ form_data.incident_description }}</td>
+          </tr>
+          <tr>
+            <th>{% tr "Safe Contact Phone" "নিরাপদ বিকল্প নম্বর" %}</th>
+            <td>{{ form_data.safe_contact_number|default:"—" }}</td>
+          </tr>
+          <tr>
+            <th>{% tr "Safe Contact Hours" "নিরাপদ যোগাযোগের সময়" %}</th>
+            <td>{{ form_data.safe_contact_time|default:"—" }}</td>
+          </tr>
+          <tr>
+            <th>{% tr "Channel & Language" "মাধ্যম ও ভাষা" %}</th>
+            <td>UDC Assisted ({{ form_data.language|upper }})</td>
+          </tr>
+          <tr>
+            <th>{% tr "Informed Consent & Read-Back" "সচেতন সম্মতি ও পাঠ" %}</th>
+            <td><span class="badge badge-accepted">✓ {% tr "Verified by Operator" "অপারেটর কর্তৃক যাচাইকৃত" %}</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <form method="POST" action="{% url 'cases:udc_intake' %}" onsubmit="if(event.submitter && event.submitter.value === 'submit'){ event.submitter.disabled = true; event.submitter.innerText = 'Submitting... / প্রক্রিয়াধীন...'; }">
+      {% csrf_token %}
+      <input type="hidden" name="submission_token" value="{{ submission_token }}">
+      <input type="hidden" name="name" value="{{ form_data.name }}">
+      <input type="hidden" name="phone" value="{{ form_data.phone }}">
+      <input type="hidden" name="address" value="{{ form_data.address }}">
+      <input type="hidden" name="legal_problem" value="{{ form_data.legal_problem }}">
+      <input type="hidden" name="incident_description" value="{{ form_data.incident_description }}">
+      <input type="hidden" name="preferred_channel" value="{{ form_data.preferred_channel }}">
+      <input type="hidden" name="safe_contact_number" value="{{ form_data.safe_contact_number }}">
+      <input type="hidden" name="safe_contact_time" value="{{ form_data.safe_contact_time }}">
+      <input type="hidden" name="language" value="{{ form_data.language }}">
+      <input type="hidden" name="citizen_consent" value="on">
+      <input type="hidden" name="review_read_back" value="on">
+
+      <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 1.25rem;">
+        <button type="submit" name="action" value="edit" class="btn btn-secondary">
+          ← {% tr "Back to Edit" "সংশোধন করতে ফিরুন" %}
+        </button>
+
+        <button type="submit" name="action" value="submit" class="btn btn-primary" style="background-color: var(--primary-color);">
+          ✓ {% tr "Final Submit & End UDC Session" "চূড়ান্ত জমা ও ইউডিসি সেশন সমাপ্ত" %}
+        </button>
+      </div>
+    </form>
+
+  </div>
+</div>
+{% endblock %}

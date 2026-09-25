@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% load dlas_tags %}
+
+{% block title %}
+  {% tr "UDC Submission Confirmed - DLAS" "ইউডিসি আবেদন নিশ্চিতকরণ - ডিএলএএস" %}
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 750px; margin: 2rem auto;">
+  <div class="card" style="text-align: center; padding: 2.5rem 1.5rem; border-top: 4px solid var(--success-color);">
+    <div style="font-size: 3rem; color: var(--success-color); margin-bottom: 0.75rem;">
+      ✓
+    </div>
+
+    <h2 style="color: var(--text-primary); margin-bottom: 0.5rem;">
+      {% tr "Assisted Application Submitted Successfully" "সহায়তাকৃত আবেদন সফলভাবে জমা হয়েছে" %}
+    </h2>
+    <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+      {% tr "Please provide the official Application ID below to the citizen for all future tracking and inquiries." "ভবিষ্যতে ট্র্যাকিং ও অনুসন্ধানের জন্য নিচের অফিসিয়াল অ্যাপ্লিকেশন আইডিটি আবেদনকারীকে হস্তান্তর করুন।" %}
+    </p>
+
+    <!-- Highlighted Application ID -->
+    <div style="background-color: #f0fdf4; border: 2px dashed #86efac; border-radius: var(--radius-lg); padding: 1.5rem; margin-bottom: 1.5rem; display: inline-block; min-width: 320px;">
+      <span style="font-size: 0.85rem; color: #166534; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+        {% tr "Official Application Identifier" "অফিসিয়াল অ্যাপ্লিকেশন আইডি" %}
+      </span>
+      <div style="font-size: 2.25rem; font-weight: 900; color: var(--primary-color); letter-spacing: 1px; margin: 0.35rem 0;">
+        {{ application_id }}
+      </div>
+      <span style="font-size: 0.85rem; color: var(--text-muted);">
+        {% tr "Citizen:" "নাগরিক:" %} {{ applicant_name }} | {{ created_at|date:"d M Y, h:i A" }}
+      </span>
+    </div>
+
+    <!-- Security & Access Termination Notice (PRD Section 4.5 / 346) -->
+    <div class="card" style="border-left: 4px solid var(--accent-color); text-align: left; background-color: #fffbeb; margin-bottom: 1.5rem;">
+      <h4 style="color: #92400e; margin-bottom: 0.35rem;">
+        {% tr "UDC Session Access Terminated" "ইউডিসি সেশন প্রবেশাধিকার সমাপ্ত" %}
+      </h4>
+      <p style="font-size: 0.88rem; color: #78350f; margin: 0;">
+        {% tr "Under DLAS privacy architecture, UDC operator access to this record terminates immediately upon submission. Operators cannot browse, view, or modify the case further. The citizen must retain this Application ID for DLAO follow-ups." "ডিএলএএস গোপনীয়তা নীতিমালা অনুযায়ী জমাদানের সাথে সাথে এই রেকর্ডে ইউডিসি অপারেটরের প্রবেশাধিকার শেষ হয়। অপারেটর আর এই তথ্য দেখতে বা পরিবর্তন করতে পারবেন না। নাগরিককে এই অ্যাপ্লিকেশন আইডি সংরক্ষণ করতে হবে।" %}
+      </p>
+    </div>
+
+    <div>
+      <a href="{% url 'dashboard:udc_operator' %}" class="btn btn-primary">
+        ← {% tr "Return to UDC Console / সমাপ্ত করুন" "ইউডিসি ড্যাশবোর্ডে ফিরুন" %}
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,178 @@
+{% extends 'base.html' %}
+{% load dlas_tags %}
+
+{% block title %}
+  {% tr "Mediation Session" "মধ্যস্থতা অধিবেশন" %} - {{ mediation.case.case_id }} - DLAS
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+  <div>
+    <h2>
+      {% tr "Mediation Session" "মধ্যস্থতা অধিবেশন" %}: {{ mediation.case.case_id }}
+      <span class="badge 
+        {% if mediation.status == 'agreed' %}badge-accepted
+        {% elif mediation.status == 'failed' %}badge-rejected
+        {% elif mediation.status == 'scheduled' %}badge-in-progress
+        {% elif mediation.status == 'in_progress' %}badge-under-review
+        {% else %}badge-pending{% endif %}">
+        {{ mediation.get_status_display }}
+      </span>
+    </h2>
+    <p style="color: var(--text-muted); font-size: 0.9rem;">
+      {% tr "Designated Mediator" "নির্ধারিত মধ্যস্থতাকারী" %}: <strong>{{ mediation.mediator.get_full_name|default:mediation.mediator.username }}</strong>
+      &bull; {% tr "Mode" "পদ্ধতি" %}: <strong>{{ mediation.get_mode_display }}</strong>
+      {% if mediation.scheduled_at %}
+        &bull; {% tr "Scheduled" "নির্ধারিত" %}: {{ mediation.scheduled_at|date:"d M Y, h:i A" }}
+      {% endif %}
+    </p>
+  </div>
+  <div>
+    <a href="{% url 'dashboard:mediator' %}" class="btn btn-secondary">
+      &larr; {% tr "Back to Workspace" "কর্মক্ষেত্রে ফিরুন" %}
+    </a>
+  </div>
+</div>
+
+<div class="grid-2" style="grid-template-columns: 3fr 2fr; gap: 1.5rem; align-items: start;">
+  <!-- Left Column: Case Information & Dispute Background -->
+  <div>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h3 class="card-title">{% tr "Dispute Background & Case Summary" "বিরোধের পটভূমি ও মামলার বিবরণ" %}</h3>
+      </div>
+      <table class="table" style="margin-bottom: 1rem;">
+        <tbody>
+          <tr>
+            <td style="width: 35%; color: var(--text-muted); font-weight: 600;">{% tr "Case Identifier" "মামলা সনাক্তকারী" %}</td>
+            <td>
+              <a href="{% url 'cases:officer_case_detail' mediation.case.case_id %}" style="font-weight: 700; color: var(--primary-color);">
+                {{ mediation.case.case_id }}
+              </a>
+            </td>
+          </tr>
+          <tr>
+            <td style="color: var(--text-muted); font-weight: 600;">{% tr "Applicant Name" "আবেদনকারীর নাম" %}</td>
+            <td><strong>{{ mediation.case.application.full_name }}</strong></td>
+          </tr>
+          <tr>
+            <td style="color: var(--text-muted); font-weight: 600;">{% tr "Legal Category" "আইনি শ্রেণি" %}</td>
+            <td>{{ mediation.case.application.get_legal_problem_display }}</td>
+          </tr>
+          <tr>
+            <td style="color: var(--text-muted); font-weight: 600;">{% tr "Incident Narrative" "ঘটনার বর্ণনা" %}</td>
+            <td style="line-height: 1.5;">{{ mediation.case.application.incident_description }}</td>
+          </tr>
+          <tr>
+            <td style="color: var(--text-muted); font-weight: 600;">{% tr "Contact Channel & Safe Contact" "যোগাযোগ চ্যানেল ও নিরাপদ ব্যবস্থা" %}</td>
+            <td>
+              {{ mediation.case.application.get_preferred_channel_display }}
+              {% if mediation.case.application.safe_contact_number %}
+                &bull; <span class="badge badge-under-review" style="background-color: #fef3c7; color: #92400e;">
+                  🛡️ {% tr "Safe Contact:" "নিরাপদ নম্বর:" %} {{ mediation.case.application.safe_contact_number }}
+                </span>
+              {% endif %}
+              {% if mediation.case.application.safe_contact_time %}
+                <small style="display: block; color: var(--text-muted); margin-top: 0.2rem;">
+                  {% tr "Permitted Hours:" "অনুমোদিত সময়:" %} {{ mediation.case.application.safe_contact_time }}
+                </small>
+              {% endif %}
+            </td>
+          </tr>
+
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Prior Outcome / Notes if already recorded -->
+    {% if mediation.outcome %}
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">{% tr "Recorded Session Outcome & Accord" "সংরক্ষিত সেশন ফলাফল ও নিষ্পত্তি চুক্তি" %}</h3>
+        </div>
+        <div style="background-color: var(--background); padding: 1rem; border-radius: 6px; border: 1px solid var(--border-color); line-height: 1.6;">
+          <p style="margin: 0 0 0.5rem 0;">
+            <strong>{% tr "Attendance Recorded" "উপস্থিতি" %}:</strong> {{ mediation.attendance_status }}
+          </p>
+          <p style="margin: 0 0 0.5rem 0;">
+            <strong>{% tr "Settlement / Accord Terms" "চুক্তির শর্তাবলি" %}:</strong>
+          </p>
+          <p style="margin: 0; white-space: pre-wrap;">{{ mediation.outcome }}</p>
+          {% if mediation.completed_at %}
+            <p style="margin-top: 0.75rem; font-size: 0.8rem; color: var(--text-muted);">
+              {% tr "Completed on" "সম্পন্ন হয়েছে" %}: {{ mediation.completed_at|date:"d M Y, h:i A" }}
+            </p>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Right Column: Human Mediator Outcome Recording -->
+  <div>
+    <div class="card" style="border-top: 4px solid var(--accent-color);">
+      <div class="card-header">
+        <h3 class="card-title">{% tr "Record ADR Hearing & Outcome" "এডিআর শুনানি ও ফলাফল সংরক্ষণ" %}</h3>
+      </div>
+
+      <div class="alert alert-info" style="font-size: 0.82rem; margin-bottom: 1rem; line-height: 1.4;">
+        <strong>{% tr "Human Authority Mandate" "মানবিক কর্তৃত্বের অনুশাসন" %}:</strong>
+        {% tr "AI systems are prohibited from deciding or finalizing mediation agreements. You as the human mediator must independently verify agreement and record outcomes." "মধ্যস্থতার ফলাফল নির্ধারণে এআই কোনো সিদ্ধান্ত নিতে পারবে না। মানব মধ্যস্থতাকারী হিসেবে আপনাকে স্বাধীনভাবে ফলাফল লিপিবদ্ধ করতে হবে।" %}
+      </div>
+
+      <form method="POST">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="record_outcome">
+
+        <div class="form-group">
+          <label class="form-label">{% tr "Session Attendance" "সেশন উপস্থিতি" %} *</label>
+          <select name="attendance_status" class="form-control" required>
+            <option value="both_present" {% if mediation.attendance_status == 'both_present' %}selected{% endif %}>
+              {% tr "Both Parties Present" "উভয় পক্ষ উপস্থিত" %}
+            </option>
+            <option value="applicant_only" {% if mediation.attendance_status == 'applicant_only' %}selected{% endif %}>
+              {% tr "Applicant Only Present" "কেবল আবেদনকারী উপস্থিত" %}
+            </option>
+            <option value="respondent_only" {% if mediation.attendance_status == 'respondent_only' %}selected{% endif %}>
+              {% tr "Respondent / Other Party Only Present" "কেবল অপর পক্ষ উপস্থিত" %}
+            </option>
+            <option value="neither_present" {% if mediation.attendance_status == 'neither_present' %}selected{% endif %}>
+              {% tr "Neither Party Present" "উভয় পক্ষ অনুপস্থিত" %}
+            </option>
+            <option value="pending" {% if mediation.attendance_status == 'pending' %}selected{% endif %}>
+              {% tr "Pending Session" "সেশন অপেক্ষমাণ" %}
+            </option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">{% tr "Mediation State / Outcome" "মধ্যস্থতার অবস্থা / ফলাফল" %} *</label>
+          <select name="status" class="form-control" required>
+            <option value="in_progress" {% if mediation.status == 'in_progress' %}selected{% endif %}>
+              {% tr "In Progress / Follow-up Required" "চলমান / পরবর্তী সেশন আবশ্যক" %}
+            </option>
+            <option value="agreed" {% if mediation.status == 'agreed' %}selected{% endif %}>
+              {% tr "Settlement Reached (Resolves Case)" "আপস মীমাংসা সম্পন্ন (মামলা নিষ্পত্তিকৃত)" %}
+            </option>
+            <option value="failed" {% if mediation.status == 'failed' %}selected{% endif %}>
+              {% tr "Mediation Failed / Impasse" "মধ্যস্থতা ব্যর্থ / মতানৈক্য" %}
+            </option>
+            <option value="closed" {% if mediation.status == 'closed' %}selected{% endif %}>
+              {% tr "Closed Without Accord" "চুক্তি ব্যতীত সমাপ্ত" %}
+            </option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">{% tr "Settlement Terms / Session Proceedings" "মীমাংসা চুক্তি / অধিবেশনের বিবরণ" %} *</label>
+          <textarea name="outcome" class="form-control" rows="5" required placeholder="{% tr 'Detail the terms of agreement or reasons for failure...' 'আপসের শর্তাবলি অথবা ব্যর্থতার কারণ বিস্তারিত উল্লেখ করুন...' %}">{{ mediation.outcome|default:'' }}</textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%;">
+          {% tr "Record Official Outcome" "ফলাফল আনুষ্ঠানিকভাবে লিপিবদ্ধ করুন" %}
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

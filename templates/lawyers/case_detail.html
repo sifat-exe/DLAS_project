@@ -1,0 +1,228 @@
+{% extends 'base.html' %}
+{% load dlas_tags %}
+
+{% block title %}
+  {% tr "Lawyer Workspace - " "আইনজীবী কর্মক্ষেত্র - " %}{{ case_record.case_id }}
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 900px; margin: 1rem auto;">
+  <div class="dashboard-header">
+    <div>
+      <h2>{% tr "Panel Lawyer Case Workspace" "প্যানেল আইনজীবী মামলা কর্মক্ষেত্র" %}</h2>
+      <p style="color: var(--text-muted); font-size: 0.9rem;">
+        {% tr "Proceeding updates, hearing tracking, and lawyer representation records." "মামলার অগ্রগতি লিপিবদ্ধকরণ, শুনানির তথ্য ও আইনি সহায়তা রেকর্ড।" %}
+      </p>
+    </div>
+    <div>
+      <a href="{% url 'dashboard:panel_lawyer' %}" class="btn btn-secondary btn-sm">
+        ← {% tr "Back to Lawyer Worklist" "কার্যতালিকায় ফিরুন" %}
+      </a>
+    </div>
+  </div>
+
+  <!-- Primary Case Info Card -->
+  <div class="card" style="border-top: 4px solid var(--secondary-color);">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+      <div>
+        <span style="font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">
+          {% tr "Case Identifier" "কেস নম্বর" %}
+        </span>
+        <div style="font-size: 1.85rem; font-weight: 800; color: var(--secondary-color);">
+          {{ case_record.case_id }}
+        </div>
+        <span class="form-hint">
+          {% tr "Applicant:" "আবেদনকারী:" %} <strong>{{ application.name }}</strong> | 
+          {% tr "Assigned on:" "নিয়োগের তারিখ:" %} {{ case_record.accepted_at|date:"d M Y" }}
+        </span>
+      </div>
+
+      <div>
+        <span class="badge badge-accepted" style="font-size: 0.95rem; padding: 0.35rem 0.8rem;">
+          {{ case_record.get_status_display }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Confidentiality Reminder (PRD Line 315) -->
+    <div style="background-color: #f8fafc; border-left: 4px solid var(--primary-color); padding: 0.75rem 1rem; border-radius: 0 var(--radius-md) var(--radius-md) 0; font-size: 0.85rem; color: var(--text-secondary);">
+      <strong>{% tr "Privacy Restriction:" "গোপনীয়তা বিধিমালা:" %}</strong>
+      {% tr "Lawyers have restricted access limited to legal proceedings. Modifying citizen contact preferences or altering historical audit records is strictly prohibited." "আইনজীবীর প্রবেশাধিকার শুধুমাত্র আইনি কার্যক্রমে সীমাবদ্ধ। নাগরিকের নিরাপদ যোগাযোগের তথ্য পরিবর্তন বা পূর্ববর্তী অডিট লগ মুছে ফেলা নিষিদ্ধ।" %}
+    </div>
+  </div>
+
+  <!-- Case Matter Details -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">{% tr "Legal Problem & Facts" "মামলার বিষয় ও বিবরণ" %}</h3>
+    </div>
+    <p><strong>{% tr "Problem Summary:" "আইনি সমস্যা:" %}</strong> {{ application.legal_problem }}</p>
+    <p style="white-space: pre-wrap; margin-top: 0.5rem; color: var(--text-secondary);">{{ application.incident_description }}</p>
+  </div>
+
+  <!-- Action Panels: 1. Add Proceeding Update; 2. Request Reassignment -->
+  <div class="grid-2">
+    <!-- Action 1: Add Proceeding Update -->
+    <div class="card" style="border-top: 3px solid var(--primary-color);">
+      <div class="card-header">
+        <h4 class="card-title">{% tr "Add Hearing / Proceeding Update" "শুনানি বা মামলার অগ্রগতি যোগ করুন" %}</h4>
+      </div>
+      <form method="POST" action="{% url 'lawyers:case_detail' case_record.case_id %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_update">
+        <div class="form-group">
+          <label class="form-label" for="notes">{% tr "Update Notes / Next Hearing Date *" "অগ্রগতির বিবরণ / পরবর্তী শুনানির তারিখ *" %}</label>
+          <textarea name="notes" id="notes" class="form-textarea" rows="4" placeholder="e.g. Written statement filed. Next court hearing scheduled for 15 October." required></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm" style="width: 100%;">
+          {% tr "Log Case Update" "আপডেট সংরক্ষণ করুন" %}
+        </button>
+      </form>
+    </div>
+
+    <!-- Action 2: Request Lawyer Change (PRD Section 2.6 / 32) -->
+    <div class="card" style="border-top: 3px solid var(--warning-color);">
+      <div class="card-header">
+        <h4 class="card-title" style="color: var(--warning-color);">{% tr "Request Case Reassignment" "আইনজীবী পরিবর্তনের আবেদন" %}</h4>
+      </div>
+      <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+        {% tr "Per PRD Section 2.6, lawyer reassignment requests are routed to an authorized DLAO officer for formal review." "পিআরডি নির্দেশনা অনুসারে আইনজীবী পরিবর্তনের আবেদন কর্মকর্তা কর্তৃক অনুমোদনের জন্য প্রেরণ করা হবে।" %}
+      </p>
+      <form method="POST" action="{% url 'lawyers:case_detail' case_record.case_id %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="request_change">
+        <div class="form-group">
+          <label class="form-label" for="change_reason">{% tr "Reason for Reassignment Request *" "পরিবর্তনের কারণ *" %}</label>
+          <textarea name="reason" id="change_reason" class="form-textarea" rows="3" placeholder="e.g. Schedule conflict with High Court / Personal conflict of interest" required></textarea>
+        </div>
+        <button type="submit" class="btn btn-secondary btn-sm" style="width: 100%;">
+          {% tr "Submit Reassignment Request" "আবেদন দাখিল করুন" %}
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Case Documents & Exhibits -->
+  <div class="card" style="border-top: 3px solid var(--primary-color);">
+    <div class="card-header">
+      <h3 class="card-title">{% tr "Attached Case Documents & Exhibits" "সংযুক্ত মামলার নথিপত্র ও প্রমাণাদি" %}</h3>
+      <span class="badge badge-in-progress">{{ documents|length }}</span>
+    </div>
+
+    {% if documents %}
+      <div class="table-container" style="margin-bottom: 1rem;">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>{% tr "Document Title" "শিরোনাম" %}</th>
+              <th>{% tr "Status" "অবস্থা" %}</th>
+              <th>{% tr "Uploaded By" "আপলোডকারী" %}</th>
+              <th>{% tr "Date" "তারিখ" %}</th>
+              <th>{% tr "Action" "পদক্ষেপ" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for doc in documents %}
+              <tr>
+                <td>
+                  <strong>{{ doc.title }}</strong>
+                  {% if doc.description %}
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">{{ doc.description }}</div>
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="badge 
+                    {% if doc.status == 'verified' %}badge-accepted
+                    {% elif doc.status == 'missing' %}badge-emergency
+                    {% elif doc.status == 'unreadable' %}badge-rejected
+                    {% else %}badge-pending{% endif %}">
+                    {{ doc.get_status_display }}
+                  </span>
+                </td>
+                <td>{{ doc.uploaded_by.get_full_name|default:doc.uploaded_by.username }}</td>
+                <td>{{ doc.created_at|date:"d M Y" }}</td>
+                <td>
+                  <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
+                    <a href="{% url 'documents:document_download' doc.id %}" target="_blank" class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.78rem;">
+                      📥 {% tr "View" "দেখুন" %}
+                    </a>
+                    <form method="POST" action="{% url 'documents:document_sign' doc.id %}" style="margin: 0;">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.78rem;" title="Sign document using MockSignatureService (SIMULATED)">
+                        ✍️ {% tr "Sign (Simulated)" "স্বাক্ষর (সিমুলেটেড)" %}
+                      </button>
+                    </form>
+                  </div>
+                </td>
+
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
+        {% tr "No evidentiary documents uploaded for this case yet." "এই মামলায় এখনো কোনো প্রমাণিক নথি সংযুক্ত করা হয়নি।" %}
+      </p>
+    {% endif %}
+
+    <!-- Lawyer Document Upload Form -->
+    <div style="background-color: var(--background); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.85rem;">
+      <h4 style="font-size: 0.88rem; margin-bottom: 0.5rem; color: var(--primary-color);">
+        ➕ {% tr "Upload Case Filing / Legal Notice" "আইনি নোটিশ / নথি আপলোড করুন" %}
+      </h4>
+      <form method="POST" action="{% url 'lawyers:case_detail' case_record.case_id %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="upload_document">
+        <div class="grid-2" style="margin-bottom: 0.5rem;">
+          <div class="form-group" style="margin: 0;">
+            <label class="form-label" style="font-size: 0.78rem;">{% tr "Title *" "শিরোনাম *" %}</label>
+            <input type="text" name="title" class="form-input" placeholder="e.g. Vakalatnama / Written Statement" required>
+          </div>
+          <div class="form-group" style="margin: 0;">
+            <label class="form-label" style="font-size: 0.78rem;">{% tr "File (PDF, PNG, JPG, DOC) *" "ফাইল *" %}</label>
+            <input type="file" name="file" class="form-input" required>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom: 0.5rem;">
+          <label class="form-label" style="font-size: 0.78rem;">{% tr "Description / Exhibit Notes" "বিবরণ / প্রদর্শনীর নোট" %}</label>
+          <input type="text" name="description" class="form-input" placeholder="Optional context">
+        </div>
+        <button type="submit" class="btn btn-secondary btn-sm">
+          📤 {% tr "Upload to Case" "মামলায় সংযুক্ত করুন" %}
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Case Events Timeline -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">{% tr "Case History & Event Timeline" "মামলার ইতিহাস ও ইভেন্ট বিবরণ" %}</h3>
+      <span class="badge badge-accepted">Audit History</span>
+    </div>
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>{% tr "Timestamp" "তারিখ ও সময়" %}</th>
+            <th>{% tr "Action" "পদক্ষেপ" %}</th>
+            <th>{% tr "Actor" "সম্পাদনকারী" %}</th>
+            <th>{% tr "Description" "বিবরণ" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for event in events %}
+            <tr>
+              <td style="white-space: nowrap;">{{ event.created_at|date:"d M Y, H:i" }}</td>
+              <td><span class="badge badge-submitted">{{ event.action }}</span></td>
+              <td>{{ event.actor.username|default:"System" }} ({{ event.actor_role }})</td>
+              <td>{{ event.description }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,236 @@
+{% extends 'base.html' %}
+{% load dlas_tags %}
+
+{% block title %}
+  {% tr "Application Status - " "আবেদনের অগ্রগতি - " %}{{ application.application_id }}
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 900px; margin: 1rem auto;">
+  <div class="dashboard-header">
+    <div>
+      <h2>{% tr "Application Tracking" "আবেদনের অগ্রগতি ট্র্যাকিং" %}</h2>
+      <p style="color: var(--text-muted); font-size: 0.9rem;">
+        {% tr "Real-time status of your legal-aid intake submission." "আপনার আইনি সহায়তা আবেদনের বর্তমান অবস্থা।" %}
+      </p>
+    </div>
+    <div>
+      <a href="{% url 'dashboard:citizen' %}" class="btn btn-secondary btn-sm">
+        ← {% tr "Back to Dashboard" "ড্যাশবোর্ডে ফিরুন" %}
+      </a>
+    </div>
+  </div>
+
+  <!-- Primary ID & Status Banner -->
+  <div class="card" style="border-top: 4px solid var(--primary-color);">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+      <div>
+        <span style="font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">
+          {% tr "Official Application Identifier" "অফিসিয়াল অ্যাপ্লিকেশন আইডি" %}
+        </span>
+        <div style="font-size: 1.85rem; font-weight: 800; color: var(--primary-color); letter-spacing: 0.5px;">
+          {{ application.application_id }}
+        </div>
+        <span class="form-hint">
+          {% tr "Submitted on:" "জমাদানের তারিখ:" %} {{ application.created_at|date:"d M Y, h:i A" }}
+        </span>
+      </div>
+
+      <div style="text-align: right;">
+        <span style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">
+          {% tr "Current Status" "বর্তমান অবস্থা" %}
+        </span>
+        <span class="badge badge-submitted" style="font-size: 0.95rem; padding: 0.35rem 0.85rem;">
+          {{ application.get_status_display }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Case ID vs Application ID Distinction Notice (PRD Req 8 & 9) -->
+    <div style="background-color: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; margin-top: 1rem;">
+      <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+        <strong style="color: var(--secondary-color); font-size: 0.95rem;">
+          {% tr "Case Record Status:" "মামলা রেকর্ড অবস্থা:" %}
+        </strong>
+        {% if application.case_record %}
+          <span class="badge badge-accepted">{{ application.case_record.case_id }}</span>
+        {% else %}
+          <span class="badge badge-draft">{% tr "Case ID Not Yet Created (Awaiting Officer Acceptance)" "কেস আইডি এখনো তৈরি হয়নি (কর্মকর্তার অনুমোদনের অপেক্ষায়)" %}</span>
+        {% endif %}
+      </div>
+      <p style="font-size: 0.82rem; color: var(--text-muted); margin: 0;">
+        {% tr "Note: Under DLAS architecture, submitting an application issues an Application ID. A Case ID is only assigned once a DLAO officer formally accepts your application into the system." "নোট: ডিএলএএস নীতিমালা অনুযায়ী আবেদন জমাদানে অ্যাপ্লিকেশন আইডি প্রদান করা হয়। কর্মকর্তা আনুষ্ঠানিকভাবে আবেদনটি গ্রহণ করলেই কেবল কেস আইডি তৈরি হয়।" %}
+      </p>
+    </div>
+  </div>
+
+  <!-- Intake Details -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">{% tr "Submitted Application Details" "দাখিলকৃত আবেদনের বিবরণ" %}</h3>
+    </div>
+
+    <div class="table-container">
+      <table class="table">
+        <tbody>
+          <tr>
+            <th style="width: 30%;">{% tr "Applicant Name" "আবেদনকারীর নাম" %}</th>
+            <td>{{ application.name }}</td>
+          </tr>
+          <tr>
+            <th>{% tr "Contact Phone" "যোগাযোগের ফোন" %}</th>
+            <td>{{ application.phone }}</td>
+          </tr>
+          <tr>
+            <th>{% tr "Present Address" "বর্তমান ঠিকানা" %}</th>
+            <td>{{ application.address }}</td>
+          </tr>
+          <tr>
+            <th>{% tr "Legal Problem" "আইনি সমস্যা" %}</th>
+            <td><strong>{{ application.legal_problem }}</strong></td>
+          </tr>
+          <tr>
+            <th>{% tr "Incident Description" "ঘটনার বিবরণ" %}</th>
+            <td style="white-space: pre-wrap;">{{ application.incident_description }}</td>
+          </tr>
+          <tr>
+            <th>{% tr "Safe Contact Hours" "নিরাপদ যোগাযোগের সময়" %}</th>
+            <td>{{ application.safe_contact_time|default:"—" }}</td>
+          </tr>
+          <tr>
+            <th>{% tr "Safe Contact Number" "বিকল্প নিরাপদ নম্বর" %}</th>
+            <td>{{ application.safe_contact_number|default:"—" }}</td>
+          </tr>
+          <tr>
+            <th>{% tr "Intake Channel" "আবেদন মাধ্যম" %}</th>
+            <td>{{ application.get_preferred_channel_display }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Case Documents for Accepted Applications -->
+  {% if case_record %}
+    <div class="card" style="border-top: 4px solid var(--primary-color);">
+      <div class="card-header">
+        <h3 class="card-title">{% tr "Attached Case Documents" "সংযুক্ত মামলার নথিপত্র" %}</h3>
+        <span class="badge badge-in-progress">{{ documents|length }}</span>
+      </div>
+
+      {% if documents %}
+        <div class="table-container" style="margin-bottom: 1rem;">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>{% tr "Document Title" "শিরোনাম" %}</th>
+                <th>{% tr "Status" "অবস্থা" %}</th>
+                <th>{% tr "Uploaded" "আপলোডকৃত" %}</th>
+                <th>{% tr "Access" "অ্যাক্সেস" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for doc in documents %}
+                <tr>
+                  <td>
+                    <strong>{{ doc.title }}</strong>
+                    {% if doc.description %}
+                      <div style="font-size: 0.8rem; color: var(--text-muted);">{{ doc.description }}</div>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <span class="badge 
+                      {% if doc.status == 'verified' %}badge-accepted
+                      {% elif doc.status == 'missing' %}badge-emergency
+                      {% elif doc.status == 'unreadable' %}badge-rejected
+                      {% else %}badge-pending{% endif %}">
+                      {{ doc.get_status_display }}
+                    </span>
+                  </td>
+                  <td>{{ doc.created_at|date:"d M Y" }}</td>
+                  <td>
+                    <a href="{% url 'documents:document_download' doc.id %}" target="_blank" class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.78rem;">
+                      📥 {% tr "Download" "ডাউনলোড" %}
+                    </a>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 1rem;">
+          {% tr "No documents attached to your case record yet." "আপনার মামলায় এখনো কোনো নথি সংযুক্ত নেই।" %}
+        </p>
+      {% endif %}
+
+      <!-- Citizen Document Upload Form -->
+      <div style="background-color: var(--background); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.85rem;">
+        <h4 style="font-size: 0.88rem; margin-bottom: 0.5rem; color: var(--primary-color);">
+          ➕ {% tr "Upload Additional Evidence / Document" "অতিরিক্ত প্রমাণপত্র / দলিল আপলোড করুন" %}
+        </h4>
+        <form method="POST" action="{% url 'cases:application_detail' application.application_id %}" enctype="multipart/form-data">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="upload_document">
+          <div class="grid-2" style="margin-bottom: 0.5rem;">
+            <div class="form-group" style="margin: 0;">
+              <label class="form-label" style="font-size: 0.78rem;">{% tr "Title *" "শিরোনাম *" %}</label>
+              <input type="text" name="title" class="form-input" placeholder="e.g. NID Copy / Receipt" required>
+            </div>
+            <div class="form-group" style="margin: 0;">
+              <label class="form-label" style="font-size: 0.78rem;">{% tr "File (PDF, PNG, JPG, DOC) *" "ফাইল *" %}</label>
+              <input type="file" name="file" class="form-input" required>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom: 0.5rem;">
+            <label class="form-label" style="font-size: 0.78rem;">{% tr "Brief Description" "সংক্ষিপ্ত বিবরণ" %}</label>
+            <input type="text" name="description" class="form-input" placeholder="Optional notes">
+          </div>
+          <button type="submit" class="btn btn-secondary btn-sm">
+            📤 {% tr "Upload Document" "নথি আপলোড করুন" %}
+          </button>
+        </form>
+      </div>
+    </div>
+  {% endif %}
+
+  <!-- CaseEvent History Stream -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">{% tr "Application Event History" "আবেদনের ইভেন্ট বিবরণ" %}</h3>
+      <span class="badge badge-accepted">{% tr "Append-Only Audit" "অপরিবর্তনীয় অডিট" %}</span>
+    </div>
+
+    {% if events %}
+      <div class="table-container">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>{% tr "Timestamp" "তারিখ ও সময়" %}</th>
+              <th>{% tr "Action" "পদক্ষেপ" %}</th>
+              <th>{% tr "Role" "ভূমিকা" %}</th>
+              <th>{% tr "Provenance" "উৎস" %}</th>
+              <th>{% tr "Description" "বিবরণ" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for event in events %}
+              <tr>
+                <td style="white-space: nowrap;">{{ event.created_at|date:"d M Y, H:i" }}</td>
+                <td><span class="badge badge-submitted">{{ event.action }}</span></td>
+                <td>{{ event.actor_role }}</td>
+                <td>{{ event.get_provenance_display }}</td>
+                <td>{{ event.description }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p style="color: var(--text-muted); font-size: 0.9rem;">
+        {% tr "No audit events logged yet." "এখনো কোনো অডিট ইভেন্ট লিপিবদ্ধ হয়নি।" %}
+      </p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

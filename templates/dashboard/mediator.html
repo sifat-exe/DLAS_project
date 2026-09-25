@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+{% load dlas_tags %}
+
+{% block title %}
+  {% tr "Mediator Workspace - DLAS" "মধ্যস্থতাকারী কর্মক্ষেত্র - ডিএলএএস" %}
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+  <div>
+    <h2>{% tr "Alternative Dispute Resolution (ADR) & Mediation" "বিকল্প বিরোধ নিষ্পত্তি (এডিআর) ও মধ্যস্থতা কর্মক্ষেত্র" %}</h2>
+    <p style="color: var(--text-muted); font-size: 0.9rem;">
+      {% tr "Facilitate conciliation sessions, record attendance, and submit formal ADR settlement outcomes." "আপস-মীমাংসা অধিবেশন পরিচালনা, পক্ষসমূহের উপস্থিতি এবং নিষ্পত্তির ফলাফল সংরক্ষণ।" %}
+    </p>
+  </div>
+  <div>
+    <span class="role-pill">{% tr "Role: Mediator" "রোল: মধ্যস্থতাকারী" %}</span>
+  </div>
+</div>
+
+<div class="grid-3" style="margin-bottom: 1.5rem;">
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">{% tr "Scheduled Sessions" "নির্ধারিত সেশন" %}</span>
+      <span class="badge badge-in-progress">{{ scheduled_count|default:0 }}</span>
+    </div>
+    <p class="form-hint">{% tr "Upcoming in-person or hybrid sessions" "আসন্ন সরাসরি বা ভার্চুয়াল অধিবেশন" %}</p>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">{% tr "In Progress / Hearing" "চলমান শুনানি" %}</span>
+      <span class="badge badge-under-review">{{ in_progress_count|default:0 }}</span>
+    </div>
+    <p class="form-hint">{% tr "Hearings conducted, settlement pending" "অধিবেশন সমাপ্ত, চুক্তির অপেক্ষায়" %}</p>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">{% tr "Resolved ADR" "নিষ্পত্তিকৃত বিরোধ" %}</span>
+      <span class="badge badge-accepted">{{ resolved_count|default:0 }}</span>
+    </div>
+    <p class="form-hint">{% tr "Successfully closed mediation matters" "সফলভাবে আপসকৃত মামলা" %}</p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">{% tr "Assigned Mediation Matters" "মধ্যস্থতার জন্য প্রেরিত মামলা" %}</h3>
+    <span class="badge badge-in-progress">{{ mediations|length }}</span>
+  </div>
+
+  {% if mediations %}
+    <div class="table-responsive">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>{% tr "Case ID" "মামলা আইডি" %}</th>
+            <th>{% tr "Applicant" "আবেদনকারী" %}</th>
+            <th>{% tr "Legal Category" "আইনি শ্রেণি" %}</th>
+            <th>{% tr "Session Mode" "অধিবেশন ধরন" %}</th>
+            <th>{% tr "Scheduled Date" "নির্ধারিত তারিখ" %}</th>
+            <th>{% tr "Status" "অবস্থা" %}</th>
+            <th>{% tr "Action" "পদক্ষেপ" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in mediations %}
+            <tr>
+              <td>
+                <strong>{{ m.case.case_id }}</strong>
+              </td>
+              <td>{{ m.case.application.full_name }}</td>
+              <td>{{ m.case.application.get_legal_problem_display }}</td>
+              <td>
+                <span class="badge" style="background-color: var(--background); border: 1px solid var(--border-color); color: var(--text-color);">
+                  {{ m.get_mode_display }}
+                </span>
+              </td>
+              <td>
+                {% if m.scheduled_at %}
+                  {{ m.scheduled_at|date:"d M Y, h:i A" }}
+                {% else %}
+                  <span style="color: var(--text-muted);">{% tr "Not scheduled" "তারিখ নির্ধারিত হয়নি" %}</span>
+                {% endif %}
+              </td>
+              <td>
+                <span class="badge 
+                  {% if m.status == 'agreed' %}badge-accepted
+                  {% elif m.status == 'failed' %}badge-rejected
+                  {% elif m.status == 'scheduled' %}badge-in-progress
+                  {% elif m.status == 'in_progress' %}badge-under-review
+                  {% else %}badge-pending{% endif %}">
+                  {{ m.get_status_display }}
+                </span>
+              </td>
+              <td>
+                <a href="{% url 'mediation:mediation_detail' m.id %}" class="btn btn-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.82rem;">
+                  {% tr "Conduct Session" "সেশন পরিচালনা" %} &rarr;
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <div class="empty-state-icon">🤝</div>
+      <h3>{% tr "No mediation cases currently referred to you." "বর্তমানে কোনো মধ্যস্থতা মামলা আপনাকে অর্পণ করা হয়নি।" %}</h3>
+      <p style="color: var(--text-muted); font-size: 0.9rem;">
+        {% tr "When an authorized officer directs a case to ADR, it will be listed here with party contact details and history." "কর্মকর্তা এডিআরে মামলা পাঠালে পক্ষগণের বিবরণসহ তা এখানে প্রদর্শিত হবে।" %}
+      </p>
+    </div>
+  {% endif %}
+</div>
+
+<div class="card" style="border-left: 4px solid var(--accent-color); margin-top: 1.5rem;">
+  <h4 style="color: var(--accent-color); margin-bottom: 0.4rem;">
+    {% tr "Human Authority Constraint (PRD Section 4.4 / 330)" "মানবিক কর্তৃত্বের বাধ্যবাধকতা" %}
+  </h4>
+  <p style="font-size: 0.88rem; color: var(--text-secondary); margin: 0;">
+    {% tr "AI systems are strictly prohibited from evaluating, suggesting or executing mediation settlements. Only the designated human mediator or authorized DLAO officer may record the attendance, accord, and final outcome." "মধ্যস্থতার ফলাফল নির্ধারণে এআই কোনো সিদ্ধান্ত গ্রহণ করতে পারে না। শুধুমাত্র মানব মধ্যস্থতাকারী বা অনুমোদিত কর্মকর্তা উপস্থিতি ও নিষ্পত্তির ফলাফল অনুমোদন করতে পারেন।" %}
+  </p>
+</div>
+{% endblock %}

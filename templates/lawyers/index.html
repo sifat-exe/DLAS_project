@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% load dlas_tags %}
+
+{% block title %}
+  {% tr "Lawyers - DLAS" "আইনজীবী প্যানেল - ডিএলএএস" %}
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+  <div>
+    <h2>{% tr "Panel Lawyers Registry" "প্যানেল আইনজীবী রেজিস্ট্রি" %}</h2>
+    <p style="color: var(--text-muted); font-size: 0.9rem;">
+      {% tr "Lawyer roster, caseload distribution, and assignment management." "আইনজীবীদের তালিকা, মামলার চাপ বণ্টন ও বরাদ্দ ব্যবস্থাপনা।" %}
+    </p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="empty-state">
+    <div class="empty-state-icon">⚖️</div>
+    <h3>{% tr "Lawyers Roster Module" "আইনজীবী মডিউল" %}</h3>
+    <p style="color: var(--text-muted); font-size: 0.9rem;">
+      {% tr "Project foundation active. Lawyer assignment workflow will be enabled in the upcoming phase." "প্রজেক্টের প্রাথমিক ভিত্তি প্রস্তুত। পরবর্তী ধাপে আইনজীবী বরাদ্দ সক্রিয় হবে।" %}
+    </p>
+  </div>
+</div>
+{% endblock %}

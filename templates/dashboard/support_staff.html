@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% load dlas_tags %}
+
+{% block title %}
+  {% tr "Support Staff Dashboard - DLAS" "সহায়ক কর্মী ড্যাশবোর্ড - ডিএলএএস" %}
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+  <div>
+    <h2>{% tr "DLAO Support Staff Workspace" "ডিএলএও সহায়ক কর্মী কর্মক্ষেত্র" %}</h2>
+    <p style="color: var(--text-muted); font-size: 0.9rem;">
+      {% tr "Assisting officers, permitted case history lookups, and document verification." "কর্মকর্তাদের সহায়তা, অনুমোদিত মামলার ইতিহাস অনুসন্ধান ও নথি যাচাইকরণ।" %}
+    </p>
+  </div>
+  <div>
+    <span class="role-pill">{% tr "Role: Support Staff" "রোল: সহায়ক কর্মী" %}</span>
+  </div>
+</div>
+
+<div class="grid-3" style="margin-bottom: 1.5rem;">
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">{% tr "Assisted Intakes" "সহায়তাকৃত আবেদন" %}</span>
+      <span class="badge badge-submitted">0</span>
+    </div>
+    <p class="form-hint">{% tr "Walk-in citizens assisted today" "আজকের সরাসরি আবেদনকারী" %}</p>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">{% tr "Pending Documents" "অপেক্ষমাণ নথি" %}</span>
+      <span class="badge badge-under-review">0</span>
+    </div>
+    <p class="form-hint">{% tr "Files awaiting verification" "যাচাইয়ের অপেক্ষায় থাকা সংযুক্তি" %}</p>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">{% tr "Officer Requests" "কর্মকর্তার কার্যতালিকা" %}</span>
+      <span class="badge badge-in-progress">0</span>
+    </div>
+    <p class="form-hint">{% tr "Tasks delegated by DLAO officers" "ডিএলএও কর্তৃক অর্পিত কার্যক্রম" %}</p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">{% tr "Permitted Case Search & Verification" "অনুমোদিত মামলা অনুসন্ধান ও তথ্য যাচাই" %}</h3>
+  </div>
+  <div class="form-group" style="max-width: 500px;">
+    <label class="form-label" for="search-case">{% tr "Application ID or Case ID" "অ্যাপ্লিকেশন আইডি বা কেস নম্বর" %}</label>
+    <div style="display: flex; gap: 0.5rem;">
+      <input type="text" id="search-case" class="form-input" placeholder="e.g. APP-2026-001 or CASE-2026-001">
+      <button class="btn btn-secondary">{% tr "Search" "অনুসন্ধান" %}</button>
+    </div>
+    <span class="form-hint">{% tr "Searches strictly within permitted office jurisdiction" "শুধুমাত্র অনুমোদিত এখতিয়ারভুক্ত তথ্য প্রদর্শিত হবে" %}</span>
+  </div>
+
+  <div class="empty-state">
+    <div class="empty-state-icon">🔍</div>
+    <h3>{% tr "No search query executed" "কোনো অনুসন্ধান করা হয়নি" %}</h3>
+    <p style="color: var(--text-muted); font-size: 0.9rem;">
+      {% tr "Enter a reference identifier to inspect permitted case details and attached documents." "অনুমোদিত মামলার বিবরণ দেখতে একটি রেফারেন্স নম্বর লিখুন।" %}
+    </p>
+  </div>
+</div>
+{% endblock %}

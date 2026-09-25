@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% load dlas_tags %}
+
+{% block title %}
+  {% tr "Representative Portal - DLAS" "প্রতিনিধি পোর্টাল - ডিএলএএস" %}
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+  <div>
+    <h2>{% tr "Legal Aid Representative Portal" "আইনি সহায়তা প্রতিনিধি পোর্টাল" %}</h2>
+    <p style="color: var(--text-muted); font-size: 0.9rem;">
+      {% tr "Submit and manage legal-aid applications on behalf of citizens with documented authorization." "অনুমোদন সাপেক্ষে নাগরিকের পক্ষে আইনি সহায়তা আবেদন জমাদান ও পর্যবেক্ষণ।" %}
+    </p>
+  </div>
+  <div>
+    <span class="role-pill">{% tr "Role: Representative" "রোল: প্রতিনিধি" %}</span>
+  </div>
+</div>
+
+<div class="card" style="border-left: 4px solid var(--info-color);">
+  <h4 style="color: var(--info-color); margin-bottom: 0.4rem;">
+    {% tr "Provenance Notice: representative_reported" "উৎস সতর্কতা: representative_reported" %}
+  </h4>
+  <p style="font-size: 0.88rem; color: var(--text-secondary);">
+    {% tr "When an application is filed by a family member, guardian, or community worker, the audit trail flags all initial statements as 'representative_reported' until direct applicant confirmation is obtained." "যখন কোনো পারিবারিক সদস্য, অভিভাবক বা প্রতিনিধি আবেদন করেন, তখন নাগরিকের প্রত্যক্ষ যাচাইয়ের পূর্ব পর্যন্ত অডিট লগে তা 'representative_reported' হিসেবে চিহ্নিত থাকে।" %}
+  </p>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">{% tr "Represented Applications & Cases" "প্রতিনিধিত্বাধীন আবেদনসমূহ" %}</h3>
+    <button class="btn btn-primary btn-sm" disabled>
+      + {% tr "Submit Application on Behalf" "নাগরিকের পক্ষে নতুন আবেদন" %}
+    </button>
+  </div>
+
+  <div class="empty-state">
+    <div class="empty-state-icon">👥</div>
+    <h3>{% tr "No applications filed as a representative." "প্রতিনিধি হিসেবে আপনার কোনো সক্রিয় আবেদন নেই।" %}</h3>
+    <p style="color: var(--text-muted); font-size: 0.9rem;">
+      {% tr "Assisted submissions on behalf of minors, persons with disabilities, or family members will appear here." "অপ্রাপ্তবয়স্ক, প্রতিবন্ধী বা পরিবারের সদস্যদের পক্ষে দাখিলকৃত আবেদন এখানে প্রদর্শিত হবে।" %}
+    </p>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+{% load dlas_tags %}
+
+{% block title %}
+  {% tr "Referrals Management - DLAS" "রেফারেল ব্যবস্থাপনা - ডিএলএএস" %}
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+  <div>
+    <h2>{% tr "Inter-Agency & Inter-District Referrals" "আন্তঃসংস্থা ও আন্তঃজেলা রেফারেল" %}</h2>
+    <p style="color: var(--text-muted); font-size: 0.9rem;">
+      {% tr "Track outgoing referrals, acknowledgements, escalation counters, and partner agency closures." "বহির্গামী রেফারেল, প্রাপ্তিস্বীকার, পুনরাবৃত্তি ট্র্যাকিং ও সহযোগী সংস্থার নিষ্পত্তি পর্যবেক্ষণ।" %}
+    </p>
+  </div>
+  <div>
+    <a href="{% url 'dashboard:officer' %}" class="btn btn-secondary">
+      &larr; {% tr "Back to Workspace" "কর্মক্ষেত্রে ফিরে যান" %}
+    </a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">{% tr "Active Referral Directory" "সক্রিয় রেফারেল তালিকা" %}</h3>
+    <span class="badge badge-in-progress">{{ referrals|length }}</span>
+  </div>
+
+  {% if referrals %}
+    <div class="table-responsive">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>{% tr "Case ID" "মামলা আইডি" %}</th>
+            <th>{% tr "Destination Agency / Office" "প্রাপক সংস্থা / অফিস" %}</th>
+            <th>{% tr "Reason" "কারণ" %}</th>
+            <th>{% tr "Deadline" "সময়সীমা" %}</th>
+            <th>{% tr "Returns" "ফেরত সংখ্যা" %}</th>
+            <th>{% tr "Status" "অবস্থা" %}</th>
+            <th>{% tr "Action" "পদক্ষেপ" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for referral in referrals %}
+            <tr>
+              <td>
+                <a href="{% url 'cases:officer_case_detail' referral.case.case_id %}" style="font-weight: 700; color: var(--primary-color);">
+                  {{ referral.case.case_id }}
+                </a>
+              </td>
+              <td><strong>{{ referral.destination }}</strong></td>
+              <td style="max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                {{ referral.reason }}
+              </td>
+              <td>
+                {% if referral.deadline %}
+                  {{ referral.deadline|date:"d M Y" }}
+                {% else %}
+                  <span style="color: var(--text-muted);">{% tr "No deadline" "সময়সীমা নেই" %}</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if referral.returned_count >= 2 %}
+                  <span class="badge badge-emergency" style="font-weight: 800;">
+                    {{ referral.returned_count }} &bull; {% tr "Escalated" "উদ্বেগজনক" %}
+                  </span>
+                {% elif referral.returned_count > 0 %}
+                  <span class="badge badge-under-review">{{ referral.returned_count }}</span>
+                {% else %}
+                  <span style="color: var(--text-muted);">0</span>
+                {% endif %}
+              </td>
+              <td>
+                <span class="badge 
+                  {% if referral.status == 'completed' %}badge-accepted
+                  {% elif referral.status == 'escalated' %}badge-emergency
+                  {% elif referral.status == 'acknowledged' %}badge-in-progress
+                  {% elif referral.status == 'returned' %}badge-under-review
+                  {% else %}badge-pending{% endif %}">
+                  {{ referral.get_status_display }}
+                </span>
+              </td>
+              <td>
+                <a href="{% url 'referrals:referral_detail' referral.id %}" class="btn btn-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.82rem;">
+                  {% tr "Manage" "পরিচালনা" %} &rarr;
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <div class="empty-state-icon">🔄</div>
+      <h3>{% tr "No inter-agency referrals logged." "কোনো আন্তঃসংস্থা রেফারেল নথিভুক্ত নেই।" %}</h3>
+      <p style="color: var(--text-muted); font-size: 0.9rem;">
+        {% tr "Authorized DLAO officers can refer cases from individual case workspaces." "অনুমোদিত কর্মকর্তা মামলার কার্যক্ষেত্র থেকে অন্য সংস্থায় রেফার করতে পারেন।" %}
+      </p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

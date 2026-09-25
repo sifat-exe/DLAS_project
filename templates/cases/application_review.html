@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+{% load dlas_tags %}
+
+{% block title %}
+  {% tr "Review Application - DLAS" "আবেদন পর্যালোচনা - ডিএলএএস" %}
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 1rem auto;">
+  <div class="dashboard-header">
+    <div>
+      <h2>{% tr "Review Your Legal Aid Application" "আপনার আইনি সহায়তা আবেদন পর্যালোচনা করুন" %}</h2>
+      <p style="color: var(--text-muted); font-size: 0.9rem;">
+        {% tr "Step 2 of 2: Please verify your information before final submission." "ধাপ ২/২: চূড়ান্ত জমাদানের পূর্বে আপনার তথ্য যাচাই করে নিন।" %}
+      </p>
+    </div>
+    <div>
+      <span class="role-pill">{% tr "Review Step" "পর্যালোচনা ধাপ" %}</span>
+    </div>
+  </div>
+
+  <div class="card" style="border-left: 4px solid var(--info-color); margin-bottom: 1.5rem;">
+    <h4 style="color: var(--info-color); margin-bottom: 0.35rem;">
+      {% tr "Submission & Case ID Clarification" "আবেদন ও কেস আইডি সম্পর্কিত স্পষ্টীকরণ" %}
+    </h4>
+    <p style="font-size: 0.88rem; color: var(--text-secondary);">
+      {% tr "Upon clicking 'Confirm & Submit', you will receive a unique Application ID for tracking. Under DLAS rules, a Case ID is NOT generated yet — it is issued only if an authorized DLAO Officer reviews and formally accepts your matter." "চূড়ান্ত জমাদানের সাথে সাথে আপনি ট্র্যাকিংয়ের জন্য একটি 'অ্যাপ্লিকেশন আইডি' পাবেন। ডিএলএএস নিয়ম অনুসারে এখনই কোনো 'কেস আইডি' তৈরি হবে না — কেবল কর্মকর্তা আবেদনটি গ্রহণ করলেই কেস আইডি প্রদান করা হবে।" %}
+    </p>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">{% tr "Summary of Intake Information" "আবেদনে প্রদত্ত তথ্যের সারসংক্ষেপ" %}</h3>
+      <span class="badge badge-under-review">{% tr "Ready to Submit" "জমাদানের জন্য প্রস্তুত" %}</span>
+    </div>
+
+    <div class="table-container" style="margin-bottom: 1.5rem;">
+      <table class="table">
+        <tbody>
+          <tr>
+            <th style="width: 35%;">{% tr "Full Name" "পূর্ণ নাম" %}</th>
+            <td><strong>{{ form_data.name }}</strong></td>
+          </tr>
+          <tr>
+            <th>{% tr "Primary Phone" "মূল ফোন নম্বর" %}</th>
+            <td>{{ form_data.phone }}</td>
+          </tr>
+          <tr>
+            <th>{% tr "Present Address" "বর্তমান ঠিকানা" %}</th>
+            <td>{{ form_data.address }}</td>
+          </tr>
+          <tr>
+            <th>{% tr "Legal Problem Type" "আইনি সমস্যার ধরন" %}</th>
+            <td><strong>{{ form_data.legal_problem }}</strong></td>
+          </tr>
+          <tr>
+            <th>{% tr "Incident Summary" "ঘটনার বিবরণ" %}</th>
+            <td style="white-space: pre-wrap;">{{ form_data.incident_description }}</td>
+          </tr>
+          <tr>
+            <th>{% tr "Preferred Channel" "পছন্দের মাধ্যম" %}</th>
+            <td>{{ form_data.preferred_channel|title }}</td>
+          </tr>
+          <tr>
+            <th>{% tr "Safe Contact Phone" "নিরাপদ বিকল্প নম্বর" %}</th>
+            <td>{{ form_data.safe_contact_number|default:"—" }}</td>
+          </tr>
+          <tr>
+            <th>{% tr "Safe Contact Hours" "নিরাপদ যোগাযোগের সময়" %}</th>
+            <td>{{ form_data.safe_contact_time|default:"—" }}</td>
+          </tr>
+          <tr>
+            <th>{% tr "Preferred Language" "পছন্দের ভাষা" %}</th>
+            <td>{{ form_data.language|upper }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Hidden Form to finalize submission -->
+    <form method="POST" action="{% url 'cases:application_create' %}" onsubmit="if(event.submitter && event.submitter.value === 'submit'){ event.submitter.disabled = true; event.submitter.innerText = 'Submitting... / প্রক্রিয়াধীন...'; }">
+      {% csrf_token %}
+      <input type="hidden" name="submission_token" value="{{ submission_token }}">
+      <input type="hidden" name="name" value="{{ form_data.name }}">
+      <input type="hidden" name="phone" value="{{ form_data.phone }}">
+      <input type="hidden" name="address" value="{{ form_data.address }}">
+      <input type="hidden" name="legal_problem" value="{{ form_data.legal_problem }}">
+      <input type="hidden" name="incident_description" value="{{ form_data.incident_description }}">
+      <input type="hidden" name="preferred_channel" value="{{ form_data.preferred_channel }}">
+      <input type="hidden" name="safe_contact_number" value="{{ form_data.safe_contact_number }}">
+      <input type="hidden" name="safe_contact_time" value="{{ form_data.safe_contact_time }}">
+      <input type="hidden" name="language" value="{{ form_data.language }}">
+
+      <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 1.25rem;">
+        <button type="submit" name="action" value="edit" class="btn btn-secondary">
+          ← {% tr "Back & Edit Details" "ফিরে যান ও সংশোধন করুন" %}
+        </button>
+
+        <button type="submit" name="action" value="submit" class="btn btn-primary" style="background-color: var(--primary-color);">
+          ✓ {% tr "Confirm & Submit Application" "নিশ্চিত করুন ও আবেদন জমা দিন" %}
+        </button>
+      </div>
+    </form>
+
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% load dlas_tags %}
+
+{% block title %}
+  {% tr "Cases - DLAS" "মামলাসমূহ - ডিএলএএস" %}
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+  <div>
+    <h2>{% tr "Case Management" "মামলা ব্যবস্থাপনা" %}</h2>
+    <p style="color: var(--text-muted); font-size: 0.9rem;">
+      {% tr "Unified case records and audit event history." "একীভূত মামলা রেকর্ড এবং অডিট ইভেন্ট বিবরণ।" %}
+    </p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="empty-state">
+    <div class="empty-state-icon">📁</div>
+    <h3>{% tr "Case Records & Intake Module" "মামলা রেকর্ড ও আবেদন মডিউল" %}</h3>
+    <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">
+      {% tr "Submit new legal aid intake, track submitted application IDs, or view accepted cases." "নতুন আইনি সহায়তা আবেদন জমা দিন, অ্যাপ্লিকেশন আইডি ট্র্যাক করুন অথবা গৃহীত মামলা পর্যবেক্ষণ করুন।" %}
+    </p>
+    <div style="display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap;">
+      <a href="{% url 'cases:application_create' %}" class="btn btn-primary">
+        + {% tr "Submit New Application" "নতুন আবেদন দাখিল করুন" %}
+      </a>
+      <a href="{% url 'dashboard:citizen' %}" class="btn btn-secondary">
+        {% tr "Citizen Portal / My Applications" "নাগরিক পোর্টাল / আমার আবেদনসমূহ" %}
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

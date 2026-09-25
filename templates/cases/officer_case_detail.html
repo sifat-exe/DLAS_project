@@ -1,0 +1,918 @@
+{% extends 'base.html' %}
+{% load dlas_tags %}
+
+{% block title %}
+  {% tr "Officer Case Workspace - " "কর্মকর্তা মামলা কর্মক্ষেত্র - " %}{{ case_record.case_id }}
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 1050px; margin: 1rem auto;">
+  <div class="dashboard-header">
+    <div>
+      <h2>{% tr "Case Management Workspace" "মামলা পরিচালনা কর্মক্ষেত্র" %}</h2>
+      <p style="color: var(--text-muted); font-size: 0.9rem;">
+        {% tr "Full case record management, lawyer assignment, referrals, and dispute resolution." "একীভূত মামলা পরিচালনা, আইনজীবী নিয়োগ, রেফারেল এবং বিরোধ নিষ্পত্তি ব্যবস্থাপনা।" %}
+      </p>
+    </div>
+    <div>
+      <a href="{% url 'dashboard:officer' %}" class="btn btn-secondary btn-sm">
+        ← {% tr "Back to Case Queue" "মামলার কিউ-তে ফিরুন" %}
+      </a>
+    </div>
+  </div>
+
+  <!-- Primary Case Info Banner -->
+  <div class="card" style="border-top: 4px solid var(--primary-color);">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+      <div>
+        <span style="font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">
+          {% tr "Official Case Record Identifier" "অফিসিয়াল কেস রেকর্ড নম্বর" %}
+        </span>
+        <div style="font-size: 2rem; font-weight: 900; color: var(--primary-color);">
+          {{ case_record.case_id }}
+        </div>
+        <span class="form-hint">
+          {% tr "Linked Intake:" "সংযুক্ত আবেদন:" %} <strong>{{ application.application_id }}</strong> | 
+          {% tr "Accepted on:" "গ্রহণের তারিখ:" %} {{ case_record.accepted_at|date:"d M Y, h:i A" }}
+        </span>
+      </div>
+
+      <div style="display: flex; gap: 0.75rem; align-items: center;">
+        <div>
+          <span style="font-size: 0.8rem; color: var(--text-muted); display: block;">{% tr "Priority" "অগ্রাধিকার" %}</span>
+          <span class="badge badge-under-review" style="font-size: 0.9rem; padding: 0.35rem 0.75rem;">
+            {{ case_record.get_priority_display }}
+          </span>
+        </div>
+        <div>
+          <span style="font-size: 0.8rem; color: var(--text-muted); display: block;">{% tr "Case Status" "মামলার অবস্থা" %}</span>
+          <span class="badge badge-accepted" style="font-size: 0.9rem; padding: 0.35rem 0.75rem;">
+            {{ case_record.get_status_display }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div style="background-color: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.85rem 1rem; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+      <div>
+        <small style="color: var(--text-muted);">{% tr "Assigned DLAO Officer" "দায়িত্বপ্রাপ্ত ডিএলএও কর্মকর্তা" %}:</small><br>
+        <strong>{{ case_record.assigned_officer.get_full_name|default:case_record.assigned_officer.username }}</strong>
+      </div>
+      <div>
+        <small style="color: var(--text-muted);">{% tr "Assigned Panel Lawyer" "দায়িত্বপ্রাপ্ত প্যানেল আইনজীবী" %}:</small><br>
+        {% if case_record.assigned_lawyer %}
+          <strong style="color: var(--secondary-color);">{{ case_record.assigned_lawyer.get_full_name|default:case_record.assigned_lawyer.username }}</strong>
+        {% else %}
+          <span style="color: #b45309; font-weight: 600;">{% tr "None Assigned" "আইনজীবী নিযুক্ত হয়নি" %}</span>
+        {% endif %}
+      </div>
+      <div>
+        <small style="color: var(--text-muted);">{% tr "Applicant Name & Mobile" "নাগরিকের নাম ও ফোন" %}:</small><br>
+        <strong>{{ application.name }}</strong> ({{ application.phone }})
+      </div>
+    </div>
+  </div>
+
+  <!-- Safe Contact Notice if provided -->
+  {% if application.safe_contact_number or application.safe_contact_time %}
+    <div class="safe-contact-box">
+      <strong>{% tr "Mandatory Safe Contact Protocol:" "বাধ্যতামূলক নিরাপদ যোগাযোগ নির্দেশিকা:" %}</strong>
+      {% if application.safe_contact_number %}
+        {% tr "Safe Phone:" "নিরাপদ নম্বর:" %} <strong>{{ application.safe_contact_number }}</strong> | 
+      {% endif %}
+      {% if application.safe_contact_time %}
+        {% tr "Permitted Hours:" "অনুমোদিত সময়:" %} <strong>{{ application.safe_contact_time }}</strong>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  <!-- Applicant Incident Details -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">{% tr "Incident & Legal Problem" "ঘটনার বিবরণ ও আইনি সমস্যা" %}</h3>
+    </div>
+    <p><strong>{% tr "Legal Matter:" "আইনি বিষয়:" %}</strong> {{ application.legal_problem }}</p>
+    <p style="white-space: pre-wrap; margin-top: 0.5rem; color: var(--text-secondary);">{{ application.incident_description }}</p>
+  </div>
+
+  <!-- Officer Consequential Actions Grid (Phase 4) -->
+  <div class="grid-2">
+    <!-- Action 1: Change Priority -->
+    <div class="card">
+      <div class="card-header">
+        <h4 class="card-title">{% tr "1. Change Case Priority" "১. অগ্রাধিকার পরিবর্তন" %}</h4>
+      </div>
+      <form method="POST" action="{% url 'cases:officer_case_detail' case_record.case_id %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="change_priority">
+        <div class="form-group">
+          <label class="form-label" for="priority">{% tr "Select Priority" "অগ্রাধিকার নির্বাচন করুন" %}</label>
+          <select name="priority" id="priority" class="form-select">
+            {% for p_code, p_label in priority_choices %}
+              <option value="{{ p_code }}" {% if case_record.priority == p_code %}selected{% endif %}>{{ p_label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <button type="submit" class="btn btn-secondary btn-sm" style="width: 100%;">
+          {% tr "Update Priority" "অগ্রাধিকার সংরক্ষণ করুন" %}
+        </button>
+      </form>
+    </div>
+
+    <!-- Action 2: Assign Panel Lawyer -->
+    <div class="card">
+      <div class="card-header">
+        <h4 class="card-title">{% tr "2. Assign Panel Lawyer" "২. প্যানেল আইনজীবী নিয়োগ" %}</h4>
+      </div>
+      <form method="POST" action="{% url 'cases:officer_case_detail' case_record.case_id %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="assign_lawyer">
+        <div class="form-group">
+          <label class="form-label" for="lawyer_id">{% tr "Select Panel Lawyer" "আইনজীবী নির্বাচন করুন" %}</label>
+          <select name="lawyer_id" id="lawyer_id" class="form-select" required>
+            <option value="">-- {% tr "Choose from approved roster" "অনুমোদিত তালিকা থেকে বাছাই করুন" %} --</option>
+            {% for l in panel_lawyers %}
+              <option value="{{ l.id }}" {% if case_record.assigned_lawyer == l %}selected{% endif %}>
+                {{ l.get_full_name|default:l.username }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm" style="width: 100%;">
+          {% tr "Assign Lawyer to Case" "আইনজীবী বরাদ্দ করুন" %}
+        </button>
+      </form>
+    </div>
+
+    <!-- Action 3: Create Referral -->
+    <div class="card">
+      <div class="card-header">
+        <h4 class="card-title">{% tr "3. Inter-Agency Referral" "৩. আন্তঃসংস্থা বা জেলা রেফারেল" %}</h4>
+      </div>
+      <form method="POST" action="{% url 'cases:officer_case_detail' case_record.case_id %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="create_referral">
+        <div class="form-group">
+          <label class="form-label">{% tr "Destination Authority / DLAO *" "গন্তব্য অফিস / কর্তৃপক্ষ *" %}</label>
+          <input type="text" name="destination" class="form-input" placeholder="e.g. DLAO Narayanganj or Labor Court" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">{% tr "Reason for Referral *" "রেফারেলের কারণ *" %}</label>
+          <input type="text" name="reason" class="form-input" placeholder="e.g. Jurisdiction transfer" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">{% tr "Expected Action *" "প্রত্যাশিত পদক্ষেপ *" %}</label>
+          <input type="text" name="expected_action" class="form-input" placeholder="e.g. Direct intake and hearing representation" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">{% tr "Response Deadline *" "সময়সীমা *" %}</label>
+          <input type="date" name="deadline" class="form-input" required>
+        </div>
+        <button type="submit" class="btn btn-secondary btn-sm" style="width: 100%;">
+          {% tr "Create Official Referral" "রেফারেল জারি করুন" %}
+        </button>
+      </form>
+    </div>
+
+    <!-- Action 4: Initiate Mediation -->
+    <div class="card">
+      <div class="card-header">
+        <h4 class="card-title">{% tr "4. ADR / Mediation" "৪. মধ্যস্থতা ও এডিআর" %}</h4>
+      </div>
+      {% if mediation %}
+        <div style="margin-bottom: 1rem; font-size: 0.9rem;">
+          <p><strong>{% tr "Assigned Mediator:" "দায়িত্বপ্রাপ্ত মধ্যস্থতাকারী:" %}</strong> {{ mediation.mediator.get_full_name|default:mediation.mediator.username }}</p>
+          <p><strong>{% tr "Session Mode:" "পদ্ধতি:" %}</strong> {{ mediation.get_mode_display }}</p>
+          <p><strong>{% tr "ADR Status:" "অবস্থা:" %}</strong> <span class="badge badge-in-progress">{{ mediation.get_status_display }}</span></p>
+          {% if mediation.outcome %}
+            <p><strong>{% tr "Outcome:" "ফলাফল:" %}</strong> {{ mediation.outcome }}</p>
+          {% endif %}
+        </div>
+      {% else %}
+        <form method="POST" action="{% url 'cases:officer_case_detail' case_record.case_id %}">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="initiate_mediation">
+          <div class="form-group">
+            <label class="form-label">{% tr "Select Mediator *" "মধ্যস্থতাকারী নির্বাচন করুন *" %}</label>
+            <select name="mediator_id" class="form-select" required>
+              <option value="">-- {% tr "Choose Mediator" "মধ্যস্থতাকারী বাছাই করুন" %} --</option>
+              {% for m in mediators %}
+                <option value="{{ m.id }}">{{ m.get_full_name|default:m.username }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">{% tr "Mediation Mode" "মধ্যস্থতার ধরন" %}</label>
+            <select name="mode" class="form-select">
+              <option value="in_person">{% tr "In-Person" "সরাসরি" %}</option>
+              <option value="hybrid">{% tr "Hybrid" "হাইব্রিড" %}</option>
+              <option value="remote">{% tr "Remote / Online" "ভার্চুয়াল" %}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">{% tr "Scheduled Date (Optional)" "নির্ধারিত তারিখ" %}</label>
+            <input type="datetime-local" name="scheduled_at" class="form-input">
+          </div>
+          <button type="submit" class="btn btn-secondary btn-sm" style="width: 100%;">
+            {% tr "Initiate Mediation Session" "মধ্যস্থতা শুরু করুন" %}
+          </button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Action 5: Transition Case Status -->
+  <div class="card" style="border-top: 3px solid var(--secondary-color);">
+    <div class="card-header">
+      <h4 class="card-title">{% tr "5. Controlled Case Status Transition" "৫. মামলার অবস্থা পরিবর্তন ও সমাপ্তি" %}</h4>
+      <span class="badge badge-accepted">{{ case_record.get_status_display }}</span>
+    </div>
+    <form method="POST" action="{% url 'cases:officer_case_detail' case_record.case_id %}">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="transition_status">
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label" for="status">{% tr "New Target Status *" "নতুন অবস্থা নির্বাচন করুন *" %}</label>
+          <select name="status" id="status" class="form-select">
+            {% for s_code, s_label in status_choices %}
+              <option value="{{ s_code }}" {% if case_record.status == s_code %}selected{% endif %}>{{ s_label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="transition_reason">{% tr "Formal Transition Reason *" "পরিবর্তনের লিখিত কারণ *" %}</label>
+          <input type="text" name="reason" id="transition_reason" class="form-input" placeholder="e.g. Representation completed / ADR Accord reached" required>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm">
+        {% tr "Apply Status Transition" "অবস্থা পরিবর্তন প্রয়োগ করুন" %}
+      </button>
+    </form>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- Phase 5: Documents, Related Cases, Duplicate Detection, & Simulated AI -->
+  <!-- ========================================================================= -->
+
+  <!-- Section: Documents & Verification -->
+  <div class="card" style="border-top: 4px solid var(--primary-color);">
+    <div class="card-header">
+      <h3 class="card-title">{% tr "Case Documents & Evidentiary Proofs" "মামলার নথিপত্র ও প্রমাণাদি" %}</h3>
+      <span class="badge badge-in-progress">{{ documents|length }}</span>
+    </div>
+
+    {% if documents %}
+      <div class="table-container" style="margin-bottom: 1.25rem;">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>{% tr "Document Title" "শিরোনাম" %}</th>
+              <th>{% tr "Uploaded By" "আপলোডকারী" %}</th>
+              <th>{% tr "Status" "অবস্থা" %}</th>
+              <th>{% tr "AI Summary Preview" "এআই সংক্ষিপ্তসার" %}</th>
+              <th>{% tr "Date" "তারিখ" %}</th>
+              <th>{% tr "Action / Verification" "পদক্ষেপ ও যাচাই" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for doc in documents %}
+              <tr>
+                <td>
+                  <strong>{{ doc.title }}</strong>
+                  {% if doc.description %}
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">{{ doc.description }}</div>
+                  {% endif %}
+                </td>
+                <td>{{ doc.uploaded_by.get_full_name|default:doc.uploaded_by.username }}</td>
+                <td>
+                  <span class="badge 
+                    {% if doc.status == 'verified' %}badge-accepted
+                    {% elif doc.status == 'missing' %}badge-emergency
+                    {% elif doc.status == 'unreadable' %}badge-rejected
+                    {% else %}badge-pending{% endif %}">
+                    {{ doc.get_status_display }}
+                  </span>
+                </td>
+                <td style="max-width: 250px; font-size: 0.82rem;">
+                  {% if doc.ai_summary %}
+                    <span class="badge" style="background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; font-size: 0.7rem; margin-bottom: 0.2rem;">
+                      {% tr "SIMULATED AI" "সিমুলেটেড এআই" %}
+                    </span><br>
+                    <span style="color: var(--text-secondary);">{{ doc.ai_summary }}</span>
+                  {% else %}
+                    <span style="color: var(--text-muted);">—</span>
+                  {% endif %}
+                </td>
+                <td style="white-space: nowrap;">{{ doc.created_at|date:"d M Y" }}</td>
+                <td>
+                  <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                    <a href="{% url 'documents:document_download' doc.id %}" target="_blank" class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.78rem;">
+                      📥 {% tr "View" "দেখুন" %}
+                    </a>
+
+                    <!-- Staff Verification Form -->
+                    <form method="POST" action="{% url 'cases:officer_case_detail' case_record.case_id %}" style="display: flex; gap: 0.3rem; align-items: center; margin: 0;">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="verify_document">
+                      <input type="hidden" name="document_id" value="{{ doc.id }}">
+                      <select name="status" class="form-select" style="padding: 0.2rem 0.4rem; font-size: 0.78rem; width: auto;">
+                        {% for s_code, s_label in document_status_choices %}
+                          <option value="{{ s_code }}" {% if doc.status == s_code %}selected{% endif %}>{{ s_label }}</option>
+                        {% endfor %}
+                      </select>
+                      <button type="submit" class="btn btn-primary btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.78rem;">
+                        ✓ {% tr "Save" "সংরক্ষণ" %}
+                      </button>
+                    </form>
+
+                    <!-- Simulated Digital Signature Trigger -->
+                    <form method="POST" action="{% url 'documents:document_sign' doc.id %}" style="margin: 0;">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.78rem;" title="Sign document using MockSignatureService (SIMULATED)">
+                        ✍️ {% tr "Sign (Simulated)" "স্বাক্ষর (সিমুলেটেড)" %}
+                      </button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
+        {% tr "No evidentiary documents uploaded for this case yet." "এই মামলায় এখনো কোনো প্রমাণিক নথি সংযুক্ত করা হয়নি।" %}
+      </p>
+    {% endif %}
+
+    <!-- Upload Document Form -->
+    <div style="background-color: var(--background); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem;">
+      <h4 style="font-size: 0.92rem; margin-bottom: 0.75rem; color: var(--primary-color);">
+        ➕ {% tr "Upload New Case Document" "নতুন নথি আপলোড করুন" %}
+      </h4>
+      <form method="POST" action="{% url 'cases:officer_case_detail' case_record.case_id %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="upload_document">
+        <div class="grid-3" style="margin-bottom: 0.75rem;">
+          <div class="form-group" style="margin: 0;">
+            <label class="form-label" style="font-size: 0.8rem;">{% tr "Document Title *" "নথির শিরোনাম *" %}</label>
+            <input type="text" name="title" class="form-input" placeholder="e.g. Title Deed / Eviction Notice" required>
+          </div>
+          <div class="form-group" style="margin: 0;">
+            <label class="form-label" style="font-size: 0.8rem;">{% tr "Select File (PDF, PNG, JPG, DOC, max 10MB) *" "ফাইল নির্বাচন করুন *" %}</label>
+            <input type="file" name="file" class="form-input" required>
+          </div>
+          <div class="form-group" style="margin: 0;">
+            <label class="form-label" style="font-size: 0.8rem;">{% tr "Notes / Description" "বিবরণ / নোট" %}</label>
+            <input type="text" name="description" class="form-input" placeholder="Optional context">
+          </div>
+        </div>
+        <button type="submit" class="btn btn-secondary btn-sm">
+          📤 {% tr "Upload Document to Case" "মামলায় নথি আপলোড করুন" %}
+        </button>
+      </form>
+    </div>
+
+    <!-- Simulated Document Signatures Table (MockSignatureService) -->
+    <div style="margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+        <h4 style="font-size: 0.95rem; margin: 0; color: var(--primary-color);">
+          ✍️ {% tr "Cryptographic Document Signatures (MockSignatureService)" "নথির ইলেকট্রনিক স্বাক্ষর (MockSignatureService)" %}
+        </h4>
+        <span class="badge badge-simulated">{{ mock_sig_label_en }}</span>
+      </div>
+      
+      <div class="alert alert-info" style="font-size: 0.82rem; margin-bottom: 0.75rem;">
+        <strong>{% tr "Legal Disclaimer:" "আইনি বিজ্ঞপ্তি:" %}</strong>
+        {% tr "Signatures are generated and verified via MockSignatureService for prototype evaluation only. This is not a legally binding electronic signature under Bangladesh ICT Act 2006." "স্বাক্ষরসমূহ শুধুমাত্র প্রোটোটাইপ প্রদর্শনের উদ্দেশ্যে MockSignatureService দ্বারা প্রস্তুত ও যাচাইকৃত। এটি আইনগতভাবে বৈধ কোনো ডিজিটাল স্বাক্ষর নয়।" %}
+      </div>
+
+      {% if signatures %}
+        <div class="table-container">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>{% tr "Document" "নথি" %}</th>
+                <th>{% tr "Signer" "স্বাক্ষরকারী" %}</th>
+                <th>{% tr "SHA-256 Hash Preview" "এসএইচএ-২৫৬ হ্যাশ" %}</th>
+                <th>{% tr "Signed At" "স্বাক্ষরের সময়" %}</th>
+                <th>{% tr "Verification Status" "যাচাই অবস্থা" %}</th>
+                <th>{% tr "Integrity Action" "যাচাই পদক্ষেপ" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for sig in signatures %}
+                <tr>
+                  <td><strong>{{ sig.document.title }}</strong></td>
+                  <td>{{ sig.signer.username }}</td>
+                  <td><code style="font-size: 0.78rem; background: #f1f5f9; padding: 0.15rem 0.35rem; border-radius: 3px;">{{ sig.document_hash|slice:":16" }}...</code></td>
+                  <td style="font-size: 0.8rem; white-space: nowrap;">{{ sig.signed_at|date:"d M Y, H:i" }}</td>
+                  <td>
+                    {% if sig.verified %}
+                      <span class="badge badge-accepted">{% tr "Verified Match (Simulated)" "সফল যাচাই (সিমুলেটেড)" %}</span>
+                    {% else %}
+                      <span class="badge badge-rejected">{% tr "Hash Mismatch" "হ্যাশ অমিল" %}</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <form method="POST" action="{% url 'documents:signature_verify' sig.id %}" style="margin: 0;">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-secondary btn-sm" style="padding: 0.2rem 0.45rem; font-size: 0.75rem;">
+                        🔍 {% tr "Verify Hash" "হ্যাশ যাচাই" %}
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0;">
+          {% tr "No simulated signatures applied to documents yet. Use the 'Sign (Simulated)' action in the documents table above to sign an evidentiary document." "এখনো কোনো নথিতে স্বাক্ষর করা হয়নি। উপরের তালিকা থেকে 'স্বাক্ষর (সিমুলেটেড)' চাপুন।" %}
+        </p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Section: Related Cases (PRD Section 3.12: Cases are NOT merged) -->
+  <div class="card" style="border-top: 4px solid var(--secondary-color);">
+    <div class="card-header">
+      <h3 class="card-title">{% tr "Related Cases Directory" "সম্পর্কিত মামলার বিবরণ" %}</h3>
+      <span class="badge badge-accepted">{{ related_cases|length|add:reverse_related_cases|length }}</span>
+    </div>
+
+    <!-- MANDATORY NON-MERGER DISCLAIMER -->
+    <div class="alert alert-info" style="font-size: 0.86rem; margin-bottom: 1rem; border-left: 4px solid var(--secondary-color);">
+      <strong>{% tr "Mandatory Legal Principle:" "বাধ্যতামূলক আইনি নীতিমালা:" %}</strong>
+      {% tr "Related cases are NOT merged. Each case strictly retains its own Case ID, status, outcome, assigned counsel, and immutable audit history." "সম্পর্কিত মামলাসমূহ কখনোই একত্রিত বা মার্জ করা হয় না। প্রতিটি মামলা সম্পূর্ণ পৃথকভাবে নিজস্ব কেস নম্বর, আইনি অবস্থা, নিষ্পত্তির ফলাফল ও অডিট হিস্টোরি বজায় রাখে।" %}
+    </div>
+
+    {% if related_cases or reverse_related_cases %}
+      <div class="table-container" style="margin-bottom: 1rem;">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>{% tr "Related Case ID" "সম্পর্কিত কেস আইডি" %}</th>
+              <th>{% tr "Applicant" "নাগরিক" %}</th>
+              <th>{% tr "Status" "অবস্থা" %}</th>
+              <th>{% tr "Relationship Type" "সম্পর্কের ধরন" %}</th>
+              <th>{% tr "Linked By" "সংযুক্তকারী" %}</th>
+              <th>{% tr "Action" "পদক্ষেপ" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for rel in related_cases %}
+              <tr>
+                <td>
+                  <a href="{% url 'cases:officer_case_detail' rel.related_case.case_id %}" style="font-weight: 700; color: var(--primary-color);">
+                    {{ rel.related_case.case_id }}
+                  </a>
+                </td>
+                <td>{{ rel.related_case.application.name }}</td>
+                <td><span class="badge badge-accepted">{{ rel.related_case.get_status_display }}</span></td>
+                <td><strong>{{ rel.relationship_type }}</strong></td>
+                <td>{{ rel.created_by.username }}</td>
+                <td>
+                  <a href="{% url 'cases:officer_case_detail' rel.related_case.case_id %}" class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.78rem;">
+                    {% tr "Open Workspace →" "কার্যক্ষেত্র খুলুন →" %}
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+            {% for rel in reverse_related_cases %}
+              <tr>
+                <td>
+                  <a href="{% url 'cases:officer_case_detail' rel.case.case_id %}" style="font-weight: 700; color: var(--primary-color);">
+                    {{ rel.case.case_id }}
+                  </a>
+                </td>
+                <td>{{ rel.case.application.name }}</td>
+                <td><span class="badge badge-accepted">{{ rel.case.get_status_display }}</span></td>
+                <td><strong>{{ rel.relationship_type }} (Reverse)</strong></td>
+                <td>{{ rel.created_by.username }}</td>
+                <td>
+                  <a href="{% url 'cases:officer_case_detail' rel.case.case_id %}" class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.78rem;">
+                    {% tr "Open Workspace →" "কার্যক্ষেত্র খুলুন →" %}
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
+        {% tr "No related or cross-suit cases currently linked." "বর্তমানে কোনো সম্পর্কিত বা পাল্টা মামলা সংযুক্ত নেই।" %}
+      </p>
+    {% endif %}
+
+    <!-- Link Related Case Form -->
+    <div style="background-color: var(--background); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem;">
+      <h4 style="font-size: 0.92rem; margin-bottom: 0.75rem; color: var(--secondary-color);">
+        🔗 {% tr "Link a Related Case Record" "সম্পর্কিত মামলা সংযুক্ত করুন" %}
+      </h4>
+      <form method="POST" action="{% url 'cases:officer_case_detail' case_record.case_id %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="link_related_case">
+        <div class="grid-2" style="margin-bottom: 0.75rem;">
+          <div class="form-group" style="margin: 0;">
+            <label class="form-label" style="font-size: 0.8rem;">{% tr "Select Other Case Record *" "অন্য মামলা নির্বাচন করুন *" %}</label>
+            <select name="target_case_id" class="form-select" required>
+              <option value="">-- {% tr "Select Target Case" "মামলা বাছাই করুন" %} --</option>
+              {% for other in other_cases %}
+                <option value="{{ other.case_id }}">
+                  {{ other.case_id }} — {{ other.application.name }} ({{ other.application.legal_problem|truncatewords:5 }})
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group" style="margin: 0;">
+            <label class="form-label" style="font-size: 0.8rem;">{% tr "Relationship Type *" "সম্পর্কের ধরন *" %}</label>
+            <input type="text" name="relationship_type" class="form-input" placeholder="e.g. Cross-suit / Counter-claim / Same Property Partition" required>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-secondary btn-sm">
+          🔗 {% tr "Link as Related (Without Merging)" "সম্পর্কিত হিসেবে লিংক করুন (মার্জ ব্যতীত)" %}
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Section: Duplicate Candidate Detection (PRD Section 3.13: Advisory Only) -->
+  <div class="card" style="border-top: 4px solid #f59e0b;">
+    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+      <div>
+        <h3 class="card-title">{% tr "Duplicate Candidate Detection" "সম্ভাব্য ডুপ্লিকেট মামলা সনাক্তকরণ" %}</h3>
+        <span class="badge badge-under-review">{{ duplicate_candidates|length }}</span>
+      </div>
+      <form method="POST" action="{% url 'cases:officer_case_detail' case_record.case_id %}" style="margin: 0;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="scan_duplicates">
+        <button type="submit" class="btn btn-secondary btn-sm">
+          🔍 {% tr "Run AI Duplicate Scan" "এআই ডুপ্লিকেট স্ক্যান চালান" %}
+        </button>
+      </form>
+    </div>
+
+    <!-- MANDATORY ADVISORY NOTICE -->
+    <div class="alert alert-warning" style="font-size: 0.86rem; margin-bottom: 1rem; border-left: 4px solid #d97706;">
+      <strong>{% tr "Strict Advisory Protection:" "কঠোর আইনি নির্দেশিকা:" %}</strong>
+      {% tr "Duplicate detection is purely assistive and advisory. AI or automated code can NEVER reject applications, merge cases, declare fraud, or close cases. Every candidate requires human staff evaluation." "ডুপ্লিকেট সনাক্তকরণ শুধুমাত্র একটি সহায়ক প্রস্তাবনা। এআই বা অটোমেশন কখনোই মামলা বাতিল, মার্জ বা জালিয়াতি ঘোষণা করতে পারবে না। প্রতিটি বিষয়ে মানব কর্মকর্তার পর্যালোচনা বাধ্যতামূলক।" %}
+    </div>
+
+    {% if duplicate_candidates %}
+      <div class="table-container">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>{% tr "Possible Match" "সম্ভাব্য ম্যাচ" %}</th>
+              <th>{% tr "Match Score" "মিল মাত্রা" %}</th>
+              <th>{% tr "Match Reason" "মিলের কারণ" %}</th>
+              <th>{% tr "Review Status" "পর্যালোচনা অবস্থা" %}</th>
+              <th>{% tr "Reviewed By" "পর্যালোচক" %}</th>
+              <th>{% tr "Human Decision" "মানব সিদ্ধান্ত" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for cand in duplicate_candidates %}
+              <tr>
+                <td>
+                  <a href="{% url 'cases:officer_case_detail' cand.possible_case.case_id %}" style="font-weight: 700; color: var(--primary-color);">
+                    {{ cand.possible_case.case_id }}
+                  </a>
+                  <div style="font-size: 0.8rem; color: var(--text-muted);">
+                    {{ cand.possible_case.application.name }} &bull; {{ cand.possible_case.application.phone }}
+                  </div>
+                </td>
+                <td>
+                  <span class="badge {% if cand.match_score >= 0.7 %}badge-emergency{% else %}badge-under-review{% endif %}">
+                    {{ cand.match_score|floatformat:2 }} ({{ cand.match_score|stringformat:".0%"|default:"High" }})
+                  </span>
+                </td>
+                <td style="font-size: 0.84rem; max-width: 250px;">{{ cand.match_reason }}</td>
+                <td>
+                  <span class="badge 
+                    {% if cand.review_status == 'confirmed' %}badge-accepted
+                    {% elif cand.review_status == 'dismissed' %}badge-closed
+                    {% else %}badge-pending{% endif %}">
+                    {{ cand.get_review_status_display }}
+                  </span>
+                </td>
+                <td>{{ cand.reviewed_by.username|default:"Pending Review" }}</td>
+                <td>
+                  {% if cand.review_status == 'pending' %}
+                    <div style="display: flex; gap: 0.4rem;">
+                      <form method="POST" action="{% url 'cases:officer_case_detail' case_record.case_id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="review_duplicate">
+                        <input type="hidden" name="candidate_id" value="{{ cand.id }}">
+                        <input type="hidden" name="decision" value="confirmed">
+                        <button type="submit" class="btn btn-primary btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.78rem;">
+                          ✓ {% tr "Confirm Duplicate" "নিশ্চিত করুন" %}
+                        </button>
+                      </form>
+                      <form method="POST" action="{% url 'cases:officer_case_detail' case_record.case_id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="review_duplicate">
+                        <input type="hidden" name="candidate_id" value="{{ cand.id }}">
+                        <input type="hidden" name="decision" value="dismissed">
+                        <button type="submit" class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.78rem;">
+                          ✕ {% tr "Dismiss" "বাতিল করুন" %}
+                        </button>
+                      </form>
+                    </div>
+                  {% else %}
+                    <span style="font-size: 0.8rem; color: var(--text-muted);">
+                      {% tr "Evaluated" "মূল্যায়িত" %}
+                    </span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p style="color: var(--text-muted); font-size: 0.9rem;">
+        {% tr "No duplicate candidates logged. Click 'Run AI Duplicate Scan' to check against existing case records." "কোনো ডুপ্লিকেট মামলা সনাক্ত হয়নি। বিদ্যমান রেকর্ডের সাথে মেলাতে 'এআই ডুপ্লিকেট স্ক্যান চালান' বাটনে ক্লিক করুন।" %}
+      </p>
+    {% endif %}
+  </div>
+
+  <!-- Section: Simulated Assistive AI Operations (PRD Section 4.4 / ARCHITECTURE Section 4) -->
+  <div class="card" style="border-top: 4px solid #8b5cf6;">
+    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+      <div>
+        <h3 class="card-title">{% tr "Simulated AI Decision Support" "সিমুলেটেড এআই সিদ্ধান্ত সহায়তা" %}</h3>
+        <span class="badge" style="background-color: #f3e8ff; color: #6b21a8; border: 1px solid #d8b4fe; font-weight: 700;">
+          {% tr "SIMULATED AI ASSISTANCE" "সিমুলেটেড এআই সহায়তা" %}
+        </span>
+      </div>
+      <div>
+        <span class="form-hint" style="color: #6b21a8; font-weight: 600;">
+          {% tr "Provenance: AI-Inferred" "উৎস: এআই-অনুমানকৃত" %}
+        </span>
+      </div>
+    </div>
+
+    <div class="alert alert-info" style="font-size: 0.84rem; margin-bottom: 1.25rem; line-height: 1.5; background: #faf5ff; border: 1px solid #e9d5ff; color: #581c87;">
+      <strong>{% tr "Mandatory Human Authority Mandate:" "মানবিক কর্তৃত্বের অনুশাসন:" %}</strong>
+      {% tr "This module provides deterministic simulated advice only. AI has NO authority to determine legal eligibility, reject petitions, assign priority, or decide mediation. Human review is mandatory." "এই মডিউলটি শুধুমাত্র নমুনা সিদ্ধান্ত সহায়তা প্রদান করে। এআই-এর কোনো আইনি বা প্রশাসনিক কর্তৃত্ব নেই। সকল সিদ্ধান্ত মানব কর্মকর্তা কর্তৃক পর্যালোচিত হতে হবে।" %}
+    </div>
+
+    <div class="grid-2">
+      <!-- AI Box 1: Categorization & Reasoning -->
+      <div style="background: #faf5ff; border: 1px solid #e9d5ff; border-radius: var(--radius-md); padding: 1rem;">
+        <h4 style="font-size: 0.9rem; color: #6b21a8; margin-bottom: 0.4rem;">
+          🤖 {% tr "AI Legal Categorization Suggestion" "এআই প্রস্তাবিত আইনি শ্রেণি" %}
+        </h4>
+        <p style="font-size: 0.88rem; margin: 0 0 0.3rem 0;">
+          <strong>{% tr "Suggested Domain:" "প্রস্তাবিত বিষয়:" %}</strong>
+          <span class="badge badge-accepted">{{ ai_categorization.suggested_category }}</span>
+        </p>
+        <p style="font-size: 0.84rem; margin: 0 0 0.3rem 0; color: var(--text-secondary);">
+          <strong>{% tr "Confidence:" "আত্মবিশ্বাস স্কোর:" %}</strong> {{ ai_categorization.confidence|stringformat:".0%" }}
+        </p>
+        <p style="font-size: 0.82rem; margin: 0; color: var(--text-muted); font-style: italic;">
+          {{ ai_categorization.reasoning }}
+        </p>
+      </div>
+
+      <!-- AI Box 2: Missing Information Detection -->
+      <div style="background: #faf5ff; border: 1px solid #e9d5ff; border-radius: var(--radius-md); padding: 1rem;">
+        <h4 style="font-size: 0.9rem; color: #6b21a8; margin-bottom: 0.4rem;">
+          🔍 {% tr "Information Completeness Check" "তথ্য পূর্ণাঙ্গতা নিরীক্ষা" %}
+        </h4>
+        <p style="font-size: 0.88rem; margin: 0 0 0.3rem 0;">
+          <strong>{% tr "Completeness Rating:" "পূর্ণাঙ্গতা মাত্রা:" %}</strong>
+          <span class="badge {% if ai_missing_info.completeness_score >= 80 %}badge-accepted{% else %}badge-under-review{% endif %}">
+            {{ ai_missing_info.completeness_score }}%
+          </span>
+        </p>
+        {% if ai_missing_info.missing_items %}
+          <ul style="font-size: 0.82rem; color: #991b1b; margin: 0.3rem 0 0 1rem; padding: 0;">
+            {% for item in ai_missing_info.missing_items %}
+              <li>{{ item }}</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p style="font-size: 0.82rem; color: #065f46; margin: 0;">
+            ✓ {% tr "All essential facts and identifiers present." "সকল প্রয়োজনীয় তথ্য ও প্রমাণাদি বিদ্যমান।" %}
+          </p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- AI Box 3: Draft Generation Preview -->
+    <div style="background: #faf5ff; border: 1px solid #e9d5ff; border-radius: var(--radius-md); padding: 1rem; margin-top: 1rem;">
+      <h4 style="font-size: 0.9rem; color: #6b21a8; margin-bottom: 0.4rem;">
+        📝 {% tr "Simulated Case Evaluation Draft" "সিমুলেটেড মামলা মূল্যায়ন ড্রাফট" %}
+      </h4>
+      <pre style="background: #ffffff; border: 1px solid #e9d5ff; border-radius: 4px; padding: 0.75rem; font-size: 0.82rem; color: #374151; white-space: pre-wrap; font-family: monospace; line-height: 1.4; margin: 0;">{{ ai_draft_summary.content }}</pre>
+      <small style="color: var(--text-muted); display: block; margin-top: 0.4rem;">
+        {% tr "Note: This draft is generated by simulated assistive AI. The DLAO officer and appointed lawyer must review and edit before formal filing." "নোট: এই ড্রাফটটি সিমুলেটেড এআই দ্বারা তৈরি। কর্মকর্তা ও আইনজীবীকে চূড়ান্ত দাখিলের পূর্বে এটি যাচাই ও সংশোধন করতে হবে।" %}
+      </small>
+    </div>
+  </div>
+
+  <!-- Communications & Safe Contact Protocol (MockSMSService & MockIVRService) -->
+  <div class="card" style="border-top: 4px solid #0284c7;">
+    <div class="card-header">
+      <h3 class="card-title">{% tr "Outbound Communications & Safe Contact Dispatch" "বহির্গামী যোগাযোগ ও নিরাপদ বার্তা প্রেরণ" %}</h3>
+      <span class="badge badge-simulated">{{ mock_sms_label_en }}</span>
+    </div>
+
+    <!-- Safe Contact Banner -->
+    <div style="background-color: #f0f9ff; border-left: 4px solid #0284c7; padding: 0.75rem 1rem; border-radius: 0 var(--radius-md) var(--radius-md) 0; font-size: 0.86rem; margin-bottom: 1rem;">
+      <strong>{% tr "Citizen Safe Contact Rules Enforced:" "নাগরিকের নিরাপদ যোগাযোগ নীতি কার্যকর:" %}</strong>
+      {% if application.safe_contact_number %}
+        {% tr "Designated Safe Number:" "নির্ধারিত নিরাপদ নম্বর:" %} <strong style="color: #0369a1;">{{ application.safe_contact_number }}</strong> | 
+        {% tr "Permitted Hours:" "অনুমোদিত সময়:" %} <strong>{{ application.safe_contact_time|default:"Business Hours" }}</strong>
+        <p style="margin: 0.25rem 0 0 0; color: #0369a1; font-size: 0.8rem;">
+          {% tr "All communications dispatched below automatically prioritize this safe alternative contact channel." "নিচে প্রেরিত সকল বার্তা স্বয়ংক্রিয়ভাবে এই নিরাপদ নম্বরে পৌঁছাবে।" %}
+        </p>
+      {% else %}
+        {% tr "Primary Contact Phone:" "মূল ফোন নম্বর:" %} <strong>{{ application.phone }}</strong> (No alternative safe contact requested / কোনো বিকল্প নম্বর দেওয়া হয়নি)
+      {% endif %}
+    </div>
+
+    <!-- Communication Dispatch Triggers -->
+    <div class="grid-2" style="margin-bottom: 1.5rem;">
+      <!-- Send Safe SMS -->
+      <div style="border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background-color: var(--background);">
+        <h4 style="font-size: 0.92rem; margin-bottom: 0.5rem; color: #0284c7;">
+          💬 {% tr "Send Simulated SMS Notice" "সিমুলেটেড এসএমএস নোটিশ পাঠান" %}
+        </h4>
+        <form method="POST" action="{% url 'cases:officer_case_detail' case_record.case_id %}">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="send_safe_sms">
+          <div class="form-group" style="margin-bottom: 0.5rem;">
+            <label class="form-label" style="font-size: 0.8rem;">{% tr "SMS Message (Respects Safe Contact)" "এসএমএস বার্তা" %}</label>
+            <input type="text" name="message" value="DLAS Notice: Your case proceeding update has been recorded. Hearing scheduled soon." class="form-input" style="font-size: 0.85rem;" required>
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm">
+            📲 {% tr "Dispatch Safe SMS (Simulated)" "নিরাপদ এসএমএস পাঠান (সিমুলেটেড)" %}
+          </button>
+        </form>
+      </div>
+
+      <!-- Trigger Safe IVR Call -->
+      <div style="border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background-color: var(--background);">
+        <h4 style="font-size: 0.92rem; margin-bottom: 0.5rem; color: #0284c7;">
+          📞 {% tr "Trigger Simulated IVR Helpline Call" "সিমুলেটেড আইভিআর হেল্পলাইন কল করুন" %}
+        </h4>
+        <form method="POST" action="{% url 'cases:officer_case_detail' case_record.case_id %}">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="simulate_ivr_call">
+          <div class="form-group" style="margin-bottom: 0.5rem;">
+            <label class="form-label" style="font-size: 0.8rem;">{% tr "Voice Call Prompt Summary" "ভয়েস কলের সারাংশ" %}</label>
+            <input type="text" name="script_summary" value="16699 Automated Proceeding Reminder" class="form-input" style="font-size: 0.85rem;" required>
+          </div>
+          <button type="submit" class="btn btn-secondary btn-sm">
+            🎧 {% tr "Trigger IVR Call (Simulated)" "আইভিআর কল করুন (সিমুলেটেড)" %}
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Communication History Table -->
+    <h4 style="font-size: 0.92rem; margin-bottom: 0.5rem;">{% tr "Logged Case Communications" "যোগাযোগের রেকর্ড" %}</h4>
+    {% if communications %}
+      <div class="table-container">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>{% tr "Timestamp" "সময়" %}</th>
+              <th>{% tr "Channel" "চ্যানেল" %}</th>
+              <th>{% tr "Recipient" "প্রাপক" %}</th>
+              <th>{% tr "Safe Contact Used" "নিরাপদ চ্যানেল ব্যবহৃত" %}</th>
+              <th>{% tr "Result" "ফলাফল" %}</th>
+              <th>{% tr "Message" "বার্তা" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in communications %}
+              <tr>
+                <td style="font-size: 0.8rem; white-space: nowrap;">{{ c.created_at|date:"d M Y, H:i" }}</td>
+                <td><span class="badge badge-accepted" style="font-size: 0.75rem;">{{ c.get_channel_display }}</span></td>
+                <td><strong>{{ c.recipient }}</strong></td>
+                <td>
+                  {% if c.safe_contact_used %}
+                    <span class="badge badge-under-review" style="background-color: #fef3c7; color: #92400e;">
+                      🛡️ {% tr "SAFE CONTACT" "নিরাপদ যোগাযোগ" %}
+                    </span>
+                  {% else %}
+                    <span style="color: var(--text-muted); font-size: 0.8rem;">{% tr "Primary" "মূল" %}</span>
+                  {% endif %}
+                </td>
+                <td><small>{{ c.result }}</small></td>
+                <td style="font-size: 0.82rem; max-width: 250px;">{{ c.message }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0;">
+        {% tr "No communications logged for this case yet." "এই মামলায় এখনো কোনো যোগাযোগ রেকর্ড করা হয়নি।" %}
+      </p>
+    {% endif %}
+  </div>
+
+  <!-- Simulated External Services Hub (MockNIDService & MockPaymentService) -->
+  <div class="card" style="border-top: 4px solid #10b981;">
+    <div class="card-header">
+      <h3 class="card-title">{% tr "Simulated External Government & Financial Services" "সিমুলেটেড সরকারি ও আর্থিক সেবা" %}</h3>
+      <span class="badge badge-simulated">{% tr "SIMULATED ONLY" "শুধুমাত্র সিমুলেটেড" %}</span>
+    </div>
+
+    <div class="grid-2">
+      <!-- NID Verification -->
+      <div style="border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background-color: var(--background);">
+        <h4 style="font-size: 0.92rem; margin-bottom: 0.4rem; color: #047857;">
+          🪪 {% tr "Simulate National ID Verification (MockNIDService)" "জাতীয় পরিচয়পত্র যাচাই (MockNIDService)" %}
+        </h4>
+        <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+          {% tr "Accepts 10 or 17 digit test numbers. Strictly simulated internal verification." "১০ বা ১৭ ডিজিটের টেস্ট নম্বর দিন। সম্পূর্ণ অভ্যন্তরীণ সিমুলেশন।" %}
+        </p>
+        <form method="POST" action="{% url 'cases:officer_case_detail' case_record.case_id %}">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="verify_nid">
+          <div class="form-group" style="margin-bottom: 0.5rem;">
+            <label class="form-label" style="font-size: 0.8rem;">{% tr "Applicant NID (Test Input)" "নাগরিকের এনআইডি" %}</label>
+            <input type="text" name="nid_number" value="19851234567890123" class="form-input" style="font-size: 0.85rem;" required>
+          </div>
+          <button type="submit" class="btn btn-secondary btn-sm">
+            🔍 {% tr "Run Simulated NID Check" "সিমুলেটেড এনআইডি যাচাই করুন" %}
+          </button>
+        </form>
+      </div>
+
+      <!-- Payment / Honorarium & Fee Exemption -->
+      <div style="border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background-color: var(--background);">
+        <h4 style="font-size: 0.92rem; margin-bottom: 0.4rem; color: #047857;">
+          💳 {% tr "Simulated Legal Aid Payment & Fee Waiver (MockPaymentService)" "আইনগত সহায়তা ফি মওকুফ ও ভাতা (MockPaymentService)" %}
+        </h4>
+        <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+          {% tr "Simulate lawyer honorarium disbursement or verify 100% court fee exemption under LASA 2000." "আইনজীবী ভাতা অনুমোদন বা শতভাগ কোর্ট ফি মওকুফ যাচাই।" %}
+        </p>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <form method="POST" action="{% url 'cases:officer_case_detail' case_record.case_id %}" style="margin: 0;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="simulate_fee_waiver">
+            <button type="submit" class="btn btn-secondary btn-sm">
+              📜 {% tr "Verify Court Fee Waiver" "কোর্ট ফি মওকুফ সনদ" %}
+            </button>
+          </form>
+
+          <form method="POST" action="{% url 'cases:officer_case_detail' case_record.case_id %}" style="margin: 0;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="simulate_payment">
+            <input type="hidden" name="amount" value="1500">
+            <button type="submit" class="btn btn-primary btn-sm">
+              💰 {% tr "Issue Honorarium Voucher (1500 BDT)" "আইনজীবী ভাতা ভাউচার (১৫০০ টাকা)" %}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+
+  <!-- Immutable CaseEvent Audit History Stream -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">{% tr "Complete CaseEvent Audit Trail" "সম্পূর্ণ CaseEvent অডিট রেকর্ড" %}</h3>
+      <span class="badge badge-accepted">Append-Only</span>
+    </div>
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>{% tr "Timestamp" "তারিখ ও সময়" %}</th>
+            <th>{% tr "Action" "পদক্ষেপ" %}</th>
+            <th>{% tr "Actor" "সম্পাদনকারী" %}</th>
+            <th>{% tr "Role" "ভূমিকা" %}</th>
+            <th>{% tr "Provenance" "উৎস" %}</th>
+            <th>{% tr "Description" "বিবরণ" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for event in events %}
+            <tr>
+              <td style="white-space: nowrap;">{{ event.created_at|date:"d M Y, H:i" }}</td>
+              <td><span class="badge badge-submitted">{{ event.action }}</span></td>
+              <td>{{ event.actor.username|default:"System" }}</td>
+              <td>{{ event.actor_role }}</td>
+              <td>{{ event.get_provenance_display }}</td>
+              <td>{{ event.description }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

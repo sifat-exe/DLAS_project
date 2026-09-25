@@ -1,0 +1,173 @@
+{% extends 'base.html' %}
+{% load dlas_tags %}
+
+{% block title %}
+  {% tr "UDC Assisted Intake - DLAS" "ইউডিসি সহায়তাকৃত আবেদন - ডিএলএএস" %}
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 850px; margin: 1rem auto;">
+  <div class="dashboard-header">
+    <div>
+      <h2>{% tr "Union Digital Centre (UDC) Assisted Intake" "ইউনিয়ন ডিজিটাল সেন্টার (ইউডিসি) সহায়তাকৃত আবেদন" %}</h2>
+      <p style="color: var(--text-muted); font-size: 0.9rem;">
+        {% tr "Grassroots intake portal with informed citizen consent & review read-back." "গ্রামীণ নাগরিকদের জন্য সচেতন সম্মতি ও পর্যালোচনা পাঠসহ আবেদন পোর্টাল।" %}
+      </p>
+    </div>
+    <div>
+      <span class="role-pill">{% tr "Channel: UDC Assisted" "মাধ্যম: ইউডিসি সহায়তা" %}</span>
+    </div>
+  </div>
+
+  <!-- UDC Boundary Box -->
+  <div class="card" style="border-left: 4px solid var(--secondary-color); background-color: #f8fafc; margin-bottom: 1.5rem;">
+    <h4 style="color: var(--secondary-color); margin-bottom: 0.35rem;">
+      {% tr "UDC Operator Protocol Notice" "ইউডিসি উদ্যোক্তা পরিচালনা নির্দেশিকা" %}
+    </h4>
+    <p style="font-size: 0.88rem; color: var(--text-secondary); margin: 0;">
+      {% tr "1. Citizen must be present in person. 2. You must read back the entire submission in Bangla. 3. Upon submission, an Application ID is issued to the citizen and your session access terminates." "১. নাগরিককে সশরীরে উপস্থিত থাকতে হবে। ২. সম্পূর্ণ বিবরণ বাংলায় পাঠ করে শোনাতে হবে। ৩. জমাদানের সাথে সাথে নাগরিককে অ্যাপ্লিকেশন আইডি প্রদান করতে হবে এবং অপারেটরের সেশন সমাপ্ত হবে।" %}
+    </p>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">{% tr "Citizen Intake Information" "নাগরিকের আবেদন তথ্য" %}</h3>
+      <span class="badge badge-draft">{% tr "Assisted Mode" "সহায়তাকৃত মোড" %}</span>
+    </div>
+
+    <form method="POST" action="{% url 'cases:udc_intake' %}">
+      {% csrf_token %}
+      <input type="hidden" name="submission_token" value="{{ submission_token }}">
+
+      {% if form.errors %}
+        <div class="alert alert-error">
+          <strong>{% tr "Please correct the following errors:" "অনুগ্রহ করে নিম্নলিখিত ত্রুটিগুলো সংশোধন করুন:" %}</strong>
+          <ul style="margin-left: 1.25rem; margin-top: 0.5rem;">
+            {% for field, errors in form.errors.items %}
+              {% for error in errors %}
+                <li><strong>{{ field|title }}:</strong> {{ error }}</li>
+              {% endfor %}
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+
+      <!-- Step 1: Citizen Informed Consent Checkbox -->
+      <div style="background-color: #fffbeb; border: 1px solid var(--simulated-border); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1.5rem;">
+        <label style="display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer; font-size: 0.95rem; font-weight: 600; color: #92400e;">
+          {{ form.citizen_consent }}
+          <span>
+            {% tr "Mandatory Consent: I confirm that the citizen is physically present at the UDC, has provided informed voluntary consent, and authorizes the submission of this legal-aid intake." "বাধ্যতামূলক সম্মতি: আমি নিশ্চিত করছি যে নাগরিক ইউডিসিতে সশরীরে উপস্থিত আছেন, স্বেচ্ছায় সচেতন সম্মতি প্রদান করেছেন এবং এই আইনি সহায়তা আবেদন দাখিলের অনুমতি দিয়েছেন।" %}
+          </span>
+        </label>
+        {% if form.citizen_consent.errors %}
+          <div style="color: var(--danger-color); font-size: 0.85rem; margin-top: 0.4rem; margin-left: 1.8rem;">
+            {{ form.citizen_consent.errors.0 }}
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label" for="id_name">{% tr "Citizen Full Name *" "নাগরিকের পূর্ণ নাম *" %}</label>
+          {{ form.name }}
+          {% if form.name.errors %}
+            <div style="color: var(--danger-color); font-size: 0.8rem; margin-top: 0.25rem;">{{ form.name.errors.0 }}</div>
+          {% endif %}
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="id_phone">{% tr "Citizen Mobile Phone *" "নাগরিকের মোবাইল নম্বর *" %}</label>
+          {{ form.phone }}
+          {% if form.phone.errors %}
+            <div style="color: var(--danger-color); font-size: 0.8rem; margin-top: 0.25rem;">{{ form.phone.errors.0 }}</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="id_address">{% tr "Present Address *" "বর্তমান ঠিকানা *" %}</label>
+        {{ form.address }}
+        {% if form.address.errors %}
+          <div style="color: var(--danger-color); font-size: 0.8rem; margin-top: 0.25rem;">{{ form.address.errors.0 }}</div>
+        {% endif %}
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="id_legal_problem">{% tr "Legal Problem Type *" "আইনি সমস্যার ধরন *" %}</label>
+        {{ form.legal_problem }}
+        {% if form.legal_problem.errors %}
+          <div style="color: var(--danger-color); font-size: 0.8rem; margin-top: 0.25rem;">{{ form.legal_problem.errors.0 }}</div>
+        {% endif %}
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="id_incident_description">{% tr "Incident Description (What Citizen Stated) *" "ঘটনার বিবরণ (নাগরিকের বক্তব্য অনুযায়ী) *" %}</label>
+        {{ form.incident_description }}
+        {% if form.incident_description.errors %}
+          <div style="color: var(--danger-color); font-size: 0.8rem; margin-top: 0.25rem;">{{ form.incident_description.errors.0 }}</div>
+        {% endif %}
+      </div>
+
+      <!-- Safe Contact & Safeguarding Policy Banner -->
+      <div style="background-color: #f0fdf4; border-left: 4px solid #16a34a; border-radius: 0 var(--radius-md) var(--radius-md) 0; padding: 0.85rem 1rem; margin: 1.25rem 0;">
+        <strong style="color: #166534; display: block; margin-bottom: 0.25rem;">
+          🛡️ {% tr "Safe Contact & Safeguarding Protocol:" "নিরাপদ যোগাযোগ সুরক্ষানীতি:" %}
+        </strong>
+        <p style="font-size: 0.85rem; color: #166534; margin: 0; line-height: 1.45;">
+          {% tr "If the citizen is at risk, experiencing abuse, or their phone is monitored, enter a safe alternative number and preferred hours. All DLAS communication will prioritize this safe channel." "নাগরিক ঝুঁকিতে থাকলে বা ফোন নজরদারিতে থাকলে নিরাপদ বিকল্প নম্বর ও যোগাযোগের সময় উল্লেখ করুন। ডিএলএএস-এর সকল যোগাযোগ এই নিরাপদ চ্যানেলেই হবে।" %}
+        </p>
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label" for="id_safe_contact_number">{% tr "Safe Contact Phone (Optional)" "নিরাপদ বিকল্প নম্বর (ঐচ্ছিক)" %}</label>
+          {{ form.safe_contact_number }}
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="id_safe_contact_time">{% tr "Safe Contact Hours (Optional)" "নিরাপদ যোগাযোগের সময় (ঐচ্ছিক)" %}</label>
+          {{ form.safe_contact_time }}
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label" for="id_preferred_channel">{% tr "Intake Channel" "আবেদন চ্যানেল" %}</label>
+          {{ form.preferred_channel }}
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="id_language">{% tr "Citizen Language Preference" "নাগরিকের ভাষার অগ্রাধিকার" %}</label>
+          {{ form.language }}
+        </div>
+      </div>
+
+      <!-- Step 2: Review Read-Back Checkbox -->
+      <div style="background-color: #f0fdf4; border: 1px solid #86efac; border-radius: var(--radius-md); padding: 1rem; margin-top: 1.5rem; margin-bottom: 1.5rem;">
+        <label style="display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer; font-size: 0.95rem; font-weight: 600; color: #166534;">
+          {{ form.review_read_back }}
+          <span>
+            {% tr "Mandatory Review Read-Back: I confirm that I have read back the complete incident description and details to the citizen in Bangla, and the citizen has verified the statements." "বাধ্যতামূলক পর্যালোচনা পাঠ: আমি নিশ্চিত করছি যে সম্পূর্ণ বিবরণ নাগরিককে বাংলায় পাঠ করে শুনিয়েছি এবং নাগরিক এর সঠিকতা যাচাই করেছেন।" %}
+          </span>
+        </label>
+        {% if form.review_read_back.errors %}
+          <div style="color: var(--danger-color); font-size: 0.85rem; margin-top: 0.4rem; margin-left: 1.8rem;">
+            {{ form.review_read_back.errors.0 }}
+          </div>
+        {% endif %}
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 1.25rem;">
+        <a href="{% url 'dashboard:udc_operator' %}" class="btn btn-secondary">
+          ← {% tr "Cancel / Back to UDC Console" "বাতিল / ইউডিসি কনসোলে ফিরুন" %}
+        </a>
+
+        <button type="submit" name="action" value="review" class="btn btn-primary">
+          {% tr "Review Assisted Intake →" "সহায়তাকৃত তথ্য পর্যালোচনা →" %}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

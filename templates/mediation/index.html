@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% load dlas_tags %}
+
+{% block title %}
+  {% tr "Mediation & ADR Registry - DLAS" "মধ্যস্থতা ও এডিআর তালিকা - ডিএলএএস" %}
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+  <div>
+    <h2>{% tr "Alternative Dispute Resolution (ADR) Registry" "বিকল্প বিরোধ নিষ্পত্তি (এডিআর) তালিকা" %}</h2>
+    <p style="color: var(--text-muted); font-size: 0.9rem;">
+      {% tr "Facilitated conciliation sessions, scheduled hearings, and formal settlement recordings." "আপস-মীমাংসা অধিবেশন, নির্ধারিত তারিখ এবং আনুষ্ঠানিক নিষ্পত্তির রেকর্ড।" %}
+    </p>
+  </div>
+  <div>
+    <a href="{% url 'dashboard:mediator' %}" class="btn btn-secondary">
+      &larr; {% tr "Mediator Workspace" "মধ্যস্থতাকারী কর্মক্ষেত্র" %}
+    </a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">{% tr "Mediation Sessions" "মধ্যস্থতা অধিবেশনসমূহ" %}</h3>
+    <span class="badge badge-in-progress">{{ mediations|length }}</span>
+  </div>
+
+  {% if mediations %}
+    <div class="table-responsive">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>{% tr "Case ID" "মামলা আইডি" %}</th>
+            <th>{% tr "Applicant" "আবেদনকারী" %}</th>
+            <th>{% tr "Mediator" "মধ্যস্থতাকারী" %}</th>
+            <th>{% tr "Session Mode" "অধিবেশন ধরন" %}</th>
+            <th>{% tr "Scheduled At" "নির্ধারিত সময়" %}</th>
+            <th>{% tr "Status" "অবস্থা" %}</th>
+            <th>{% tr "Action" "পদক্ষেপ" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in mediations %}
+            <tr>
+              <td>
+                <a href="{% url 'cases:officer_case_detail' m.case.case_id %}" style="font-weight: 700; color: var(--primary-color);">
+                  {{ m.case.case_id }}
+                </a>
+              </td>
+              <td>{{ m.case.application.full_name }}</td>
+              <td><strong>{{ m.mediator.get_full_name|default:m.mediator.username }}</strong></td>
+              <td>
+                <span class="badge" style="background-color: var(--background); border: 1px solid var(--border-color); color: var(--text-color);">
+                  {{ m.get_mode_display }}
+                </span>
+              </td>
+              <td>
+                {% if m.scheduled_at %}
+                  {{ m.scheduled_at|date:"d M Y, h:i A" }}
+                {% else %}
+                  <span style="color: var(--text-muted);">{% tr "Not scheduled" "তারিখ নির্ধারিত হয়নি" %}</span>
+                {% endif %}
+              </td>
+              <td>
+                <span class="badge 
+                  {% if m.status == 'agreed' %}badge-accepted
+                  {% elif m.status == 'failed' %}badge-rejected
+                  {% elif m.status == 'scheduled' %}badge-in-progress
+                  {% elif m.status == 'in_progress' %}badge-under-review
+                  {% else %}badge-pending{% endif %}">
+                  {{ m.get_status_display }}
+                </span>
+              </td>
+              <td>
+                <a href="{% url 'mediation:mediation_detail' m.id %}" class="btn btn-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.82rem;">
+                  {% tr "Session Workspace" "সেশন কর্মক্ষেত্র" %} &rarr;
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <div class="empty-state-icon">🤝</div>
+      <h3>{% tr "No active mediation sessions found." "কোনো সক্রিয় মধ্যস্থতা অধিবেশন পাওয়া যায়নি।" %}</h3>
+      <p style="color: var(--text-muted); font-size: 0.9rem;">
+        {% tr "When cases are referred to ADR by DLAO officers, they will be listed here for scheduling and conciliation." "ডিএলএও কর্মকর্তা কোনো মামলা এডিআরে পাঠালে তা এখানে প্রদর্শিত হবে।" %}
+      </p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

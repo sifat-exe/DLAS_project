@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% load dlas_tags %}
+
+{% block title %}
+  {% tr "UDC Operator Portal - DLAS" "ইউডিসি উদ্যোক্তা পোর্টাল - ডিএলএএস" %}
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+  <div>
+    <h2>{% tr "Union Digital Centre (UDC) Intake Portal" "ইউনিয়ন ডিজিটাল সেন্টার (ইউডিসি) আবেদন পোর্টাল" %}</h2>
+    <p style="color: var(--text-muted); font-size: 0.9rem;">
+      {% tr "Assisted intake for grassroots citizens with consent recording & review read-back." "গ্রামীণ নাগরিকদের জন্য সহায়তাকৃত আবেদন জমাদান ও সম্মতি নথিভুক্তকরণ।" %}
+    </p>
+  </div>
+  <div>
+    <span class="role-pill">{% tr "Role: UDC Operator" "রোল: ইউডিসি উদ্যোক্তা" %}</span>
+  </div>
+</div>
+
+<!-- UDC Architecture Rule Notice (PRD Section 4.5 / 346) -->
+<div class="card" style="border-left: 4px solid var(--secondary-color); background-color: #f8fafc;">
+  <h4 style="color: var(--secondary-color); margin-bottom: 0.4rem;">
+    {% tr "UDC Operational Boundaries & Privacy Safeguards" "ইউডিসি দায়িত্বের পরিধি ও গোপনীয়তা সুরক্ষা" %}
+  </h4>
+  <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+    {% tr "1. Operator creates assisted intake with explicit citizen informed consent." "১. নাগরিকের সুস্পষ্ট সম্মতি সাপেক্ষে অপারেটর সহায়তাকৃত আবেদন প্রস্তুত করেন।" %}
+  </p>
+  <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+    {% tr "2. Must read back summary to applicant in Bangla before final submission." "২. চূড়ান্ত জমাদানের পূর্বে সম্পূর্ণ বিবরণ আবেদনকারীকে পাঠ করে শোনাতে হবে।" %}
+  </p>
+  <p style="font-size: 0.88rem; color: var(--text-secondary);">
+    {% tr "3. Access terminates immediately upon submission: UDC operators cannot browse or inspect cases post-submission." "৩. জমাদানের সাথে সাথে প্রবেশাধিকার সমাপ্ত হয়: জমাদানের পর অপারেটর মামলা ট্র্যাকিং বা পর্যবেক্ষণ করতে পারেন না।" %}
+  </p>
+</div>
+
+<!-- Intake Trigger Card -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">{% tr "Assisted Application Intake" "সহায়তাকৃত আইনি সহায়তা আবেদন" %}</h3>
+    <span class="badge badge-submitted">{% tr "Assisted Door" "সহায়তা চ্যানেল" %}</span>
+  </div>
+  <p style="color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 1.25rem;">
+    {% tr "Facilitate a new citizen application. The intake process distinguishes what the citizen stated, what was translated, and what was transcribed." "নতুন আবেদন গ্রহণ করুন। প্রক্রিয়াটি নাগরিকের বক্তব্য, অনুবাদ এবং টাইপকৃত তথ্যের উৎস আলাদাভাবে সংরক্ষণ করে।" %}
+  </p>
+  <a href="{% url 'cases:udc_intake' %}" class="btn btn-primary">
+    + {% tr "Begin Assisted Intake Form (Consent Required)" "সহায়তাকৃত আবেদন শুরু করুন (সম্মতি আবশ্যক)" %}
+  </a>
+</div>
+
+<!-- Empty Session State -->
+<div class="card">
+  <div class="empty-state">
+    <div class="empty-state-icon">🏛️</div>
+    <h3>{% tr "No Active Assisted Session" "কোনো সক্রিয় সেশন নেই" %}</h3>
+    <p style="color: var(--text-muted); font-size: 0.9rem;">
+      {% tr "Citizen data entered during an assisted session is never retained locally on the kiosk browser." "সহায়তাকৃত সেশনের তথ্য স্থানীয় কম্পিউটারে কখনোই সংরক্ষিত থাকে না।" %}
+    </p>
+  </div>
+</div>
+{% endblock %}

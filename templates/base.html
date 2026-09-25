@@ -1,0 +1,105 @@
+{% load static %}
+{% load dlas_tags %}
+<!DOCTYPE html>
+<html lang="{% if is_bangla %}bn{% else %}en{% endif %}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}{% tr "DLAS - Digital Legal Aid System" "ডিএলএএস - ডিজিটাল আইনি সহায়তা ব্যবস্থা" %}{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+  <!-- Simulated Prototype Notice Banner (PRD Out of Scope Requirement) -->
+  <div class="proto-banner">
+    <span class="badge">{% tr "SIMULATED" "সিমুলেটেড" %}</span>
+    {% tr "DLAS MVP Prototype — All external integrations (SMS, USSD, IVR, NID, Payment, 16699) are strictly simulated internal mocks." "ডিএলএএস প্রোটোটাইপ — সমস্ত বাহ্যিক সেবা (এসএমএস, ইউএসএসডি, আইভিআর, এনআইডি, পেমেন্ট, ১৬৬৯৯) কৃত্রিম মক দ্বারা প্রদর্শিত।" %}
+  </div>
+
+  <!-- Main Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-container">
+      <a href="{% url 'core:landing' %}" class="brand-link">
+        <div class="brand-logo-icon">§</div>
+        <div>
+          <div class="brand-title">{% tr "DLAS" "ডিএলএএস" %}</div>
+          <div class="brand-subtitle">{% tr "Digital Legal Aid System" "ডিজিটাল আইনি সহায়তা ব্যবস্থা" %}</div>
+        </div>
+      </a>
+
+      <nav>
+        <ul class="nav-links">
+          <li><a href="{% url 'core:landing' %}">{% tr "Home" "হোম" %}</a></li>
+          <li><a href="{% url 'dashboard:index' %}">{% tr "Dashboards" "ড্যাশবোর্ডসমূহ" %}</a></li>
+          <li><a href="{% url 'cases:index' %}">{% tr "Cases" "মামলাসমূহ" %}</a></li>
+          <li><a href="{% url 'documents:index' %}">{% tr "Documents" "নথিপত্র" %}</a></li>
+          <li><a href="{% url 'referrals:index' %}">{% tr "Referrals" "রেফারেল" %}</a></li>
+          <li><a href="{% url 'mediation:index' %}">{% tr "Mediation" "মধ্যস্থতা" %}</a></li>
+        </ul>
+      </nav>
+
+      <div class="nav-actions">
+        <!-- Language Switcher -->
+        <div class="lang-switcher" title="Switch Language / ভাষা পরিবর্তন করুন">
+          <a href="{% url 'core:set_language' 'en' %}?next={{ request.path }}" class="lang-btn {% if is_english %}active{% endif %}">EN</a>
+          <a href="{% url 'core:set_language' 'bn' %}?next={{ request.path }}" class="lang-btn {% if is_bangla %}active{% endif %}">বাংলা</a>
+        </div>
+
+        <!-- Auth / Role State -->
+        {% if user.is_authenticated or request.session.active_role %}
+          <div class="role-pill">
+            <span>●</span>
+            {% if request.session.active_role %}
+              {{ request.session.active_role|title }}
+            {% else %}
+              {{ user.username }}
+            {% endif %}
+          </div>
+          <a href="{% url 'accounts:logout' %}" class="btn btn-secondary btn-sm">
+            {% tr "Logout" "লগআউট" %}
+          </a>
+        {% else %}
+          <a href="{% url 'accounts:login' %}" class="btn btn-primary btn-sm">
+            {% tr "Login / Demo Roles" "লগইন / রোলসমূহ" %}
+          </a>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="main-wrapper">
+    <!-- Messages / Alerts -->
+    {% if messages %}
+      <div class="messages-container">
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags|default:'info' }}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% block content %}
+    {% endblock %}
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-links">
+      <a href="{% url 'core:landing' %}">{% tr "About DLAS" "ডিএলএএস পরিচিতি" %}</a>
+      <a href="{% url 'dashboard:citizen' %}">{% tr "Citizen Portal" "নাগরিক পোর্টাল" %}</a>
+      <a href="{% url 'dashboard:officer' %}">{% tr "DLAO Portal" "ডিএলএও পোর্টাল" %}</a>
+      <a href="{% url 'dashboard:udc_operator' %}">{% tr "UDC Portal" "ইউডিসি পোর্টাল" %}</a>
+      <a href="{% url 'dashboard:admin' %}">{% tr "System Admin" "সিস্টেম অ্যাডমিন" %}</a>
+    </div>
+    <p>
+      &copy; 2026 {% tr "DLAS — Digital Legal Aid System. Prototype implementation based on Master PRD & Architecture." "ডিএলএএস — ডিজিটাল লিগ্যাল এইড সিস্টেম। মাস্টার পিআরডি এবং আর্কিটেকচার ভিত্তিক প্রোটোটাইপ।" %}
+    </p>
+  </footer>
+
+  <script src="{% static 'js/main.js' %}"></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

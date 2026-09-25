@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+{% load dlas_tags %}
+
+{% block title %}
+  {% tr "Citizen Portal - DLAS" "নাগরিক পোর্টাল - ডিএলএএস" %}
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+  <div>
+    <h2>{% tr "Citizen Dashboard" "নাগরিক ড্যাশবোর্ড" %}</h2>
+    <p style="color: var(--text-muted); font-size: 0.9rem;">
+      {% tr "Access and track your legal-aid applications and assigned cases." "আপনার আইনি সহায়তা আবেদন এবং মামলার অগ্রগতি পর্যবেক্ষণ করুন।" %}
+    </p>
+  </div>
+  <div style="display: flex; gap: 0.5rem; align-items: center;">
+    <span class="role-pill">{% tr "Role: Citizen" "রোল: নাগরিক" %}</span>
+    <a href="{% url 'cases:application_create' %}" class="btn btn-primary btn-sm">
+      + {% tr "New Application" "নতুন আবেদন" %}
+    </a>
+  </div>
+</div>
+
+<!-- Safe Contact Notice -->
+<div class="safe-contact-box">
+  <strong>{% tr "Safe Contact Protection:" "নিরাপদ যোগাযোগ সতর্কতা:" %}</strong>
+  {% tr "Your phone number and safe contact preferences are strictly guarded. Court notifications and officer outreach will only use your selected safe times." "আপনার ফোন নম্বর এবং যোগাযোগের অগ্রাধিকার সুরক্ষিত। আদালতের নোটিশ বা কর্মকর্তাদের যোগাযোগ শুধুমাত্র আপনার পছন্দের সময়ে করা হবে।" %}
+</div>
+
+<!-- Key Info Cards -->
+<div class="grid-3" style="margin-bottom: 1.5rem;">
+  <div class="card">
+    <div class="card-header">
+      <h4 class="card-title">{% tr "My Applications" "আমার আবেদনসমূহ" %}</h4>
+      <span class="badge badge-submitted">{% tr "Intake" "আবেদন পর্ব" %}</span>
+    </div>
+    <div style="font-size: 1.75rem; font-weight: 700; color: var(--secondary-color);">{{ applications_count|default:0 }}</div>
+    <p class="form-hint">{% tr "Applications awaiting DLAO review" "ডিএলএও পর্যালোচনার অপেক্ষায় আবেদন" %}</p>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h4 class="card-title">{% tr "Active Cases" "সক্রিয় মামলা" %}</h4>
+      <span class="badge badge-accepted">{% tr "Accepted" "গৃহীত" %}</span>
+    </div>
+    <div style="font-size: 1.75rem; font-weight: 700; color: var(--primary-color);">0</div>
+    <p class="form-hint">{% tr "Accepted cases with assigned Case ID" "কেস আইডি সহ অনুমোদিত মামলা" %}</p>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h4 class="card-title">{% tr "Assigned Lawyer" "দায়িত্বপ্রাপ্ত আইনজীবী" %}</h4>
+      <span class="badge badge-in-progress">{% tr "Panel" "প্যানেল" %}</span>
+    </div>
+    <div style="font-size: 1.1rem; font-weight: 600; color: var(--text-secondary); margin-top: 0.5rem;">
+      {% tr "None Assigned" "এখনো নির্ধারিত হয়নি" %}
+    </div>
+    <p class="form-hint">{% tr "Assigned upon case acceptance" "মামলা গ্রহণের পর আইনজীবী নিযুক্ত হবেন" %}</p>
+  </div>
+</div>
+
+<!-- Applications List or Empty State (PRD Section 4.1) -->
+<div class="card">
+  {% if applications %}
+    <div class="card-header">
+      <h3 class="card-title">{% tr "My Submitted Applications" "আমার দাখিলকৃত আবেদনসমূহ" %}</h3>
+      <a href="{% url 'cases:application_create' %}" class="btn btn-outline btn-sm">
+        + {% tr "New Application" "নতুন আবেদন" %}
+      </a>
+    </div>
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>{% tr "Application ID" "অ্যাপ্লিকেশন আইডি" %}</th>
+            <th>{% tr "Applicant Name" "আবেদনকারীর নাম" %}</th>
+            <th>{% tr "Legal Problem" "আইনি সমস্যা" %}</th>
+            <th>{% tr "Submitted On" "আবেদনের তারিখ" %}</th>
+            <th>{% tr "Status" "অবস্থা" %}</th>
+            <th>{% tr "Action" "পদক্ষেপ" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for app in applications %}
+            <tr>
+              <td><strong>{{ app.application_id }}</strong></td>
+              <td>{{ app.name }}</td>
+              <td>{{ app.legal_problem|truncatewords:8 }}</td>
+              <td>{{ app.created_at|date:"d M Y, h:i A" }}</td>
+              <td>
+                <span class="badge badge-submitted">{{ app.get_status_display }}</span>
+              </td>
+              <td>
+                <a href="{% url 'cases:application_detail' app.application_id %}" class="btn btn-primary btn-sm">
+                  {% tr "Track / Details →" "অগ্রগতি / বিবরণ →" %}
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <div class="empty-state-icon">📄</div>
+      <h3>
+        {% tr "You have no applications yet." "আপনার কোনো আবেদন নেই।" %}
+      </h3>
+      <p style="margin-bottom: 1.5rem; max-width: 500px; margin-left: auto; margin-right: auto;">
+        {% tr "Start a new legal-aid application to receive support from the District Legal Aid Office (DLAO)." "জেলা লিগ্যাল এইড অফিস (ডিএলএও) থেকে সহায়তা পেতে একটি নতুন আবেদন শুরু করুন।" %}
+      </p>
+      <a href="{% url 'cases:application_create' %}" class="btn btn-primary">
+        {% tr "Start New Application / নতুন আবেদন" "নতুন আইনি সহায়তার আবেদন শুরু করুন" %}
+      </a>
+    </div>
+  {% endif %}
+</div>
+
+<!-- Rule / Architecture Reminder Card -->
+<div class="card" style="border-left: 4px solid var(--info-color);">
+  <h4 style="color: var(--info-color); margin-bottom: 0.5rem;">
+    {% tr "Rule Notice: Application ID vs Case ID" "নিয়ম সতর্কতা: অ্যাপ্লিকেশন আইডি বনাম কেস আইডি" %}
+  </h4>
+  <p style="font-size: 0.88rem; color: var(--text-secondary);">
+    {% tr "Under DLAS architecture, submitting an intake form immediately creates an Application ID. A Case ID is ONLY generated when an authorized DLAO Officer reviews and formally accepts the application." "ডিএলএএস নীতিমালা অনুযায়ী আবেদন জমাদানের সাথে সাথে একটি 'অ্যাপ্লিকেশন আইডি' তৈরি হয়। কেবলমাত্র একজন অনুমোদিত ডিএলএও কর্মকর্তা আবেদনটি পর্যালোচনা করে গ্রহণ করলেই 'কেস আইডি' তৈরি হয়।" %}
+  </p>
+</div>
+{% endblock %}

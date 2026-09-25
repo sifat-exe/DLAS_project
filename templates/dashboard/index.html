@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% load dlas_tags %}
+
+{% block title %}
+  {% tr "DLAS - Stakeholder Dashboards" "ডিএলএএস - স্টেকহোল্ডার ড্যাশবোর্ডসমূহ" %}
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+  <div>
+    <h2>{% tr "Stakeholder Dashboards Hub" "স্টেকহোল্ডার ড্যাশবোর্ড হাব" %}</h2>
+    <p style="color: var(--text-muted); font-size: 0.9rem;">
+      {% tr "Multi-channel access doors to ONE unified case management platform." "একটি একীভূত মামলা প্ল্যাটফর্মে বহুমুখী প্রবেশদ্বার।" %}
+    </p>
+  </div>
+  <div>
+    <span class="role-pill">{% tr "Prototype Foundation" "প্রোটোটাইপ ভিত্তি" %}</span>
+  </div>
+</div>
+
+<div class="grid-3">
+  {% for role in roles %}
+    <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
+      <div>
+        <div class="card-header">
+          <h3 class="card-title">
+            {% if is_bangla %}{{ role.name_bn }}{% else %}{{ role.name_en }}{% endif %}
+          </h3>
+          <span class="badge badge-submitted">{{ role.id }}</span>
+        </div>
+        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
+          {% if is_bangla %}{{ role.desc_bn }}{% else %}{{ role.desc_en }}{% endif %}
+        </p>
+      </div>
+      <div>
+        <a href="{% url role.url %}" class="btn btn-primary btn-sm" style="width: 100%;">
+          {% tr "Open " "খুলুন: " %}{% if is_bangla %}{{ role.name_bn }}{% else %}{{ role.name_en }}{% endif %} →
+        </a>
+      </div>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

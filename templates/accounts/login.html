@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+{% load dlas_tags %}
+
+{% block title %}
+  {% tr "DLAS - Login & Authentication" "ডিএলএএস - লগইন ও প্রমাণীকরণ" %}
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 650px; margin: 2rem auto;">
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">{% tr "DLAS Portal Access" "ডিএলএএস পোর্টাল লগইন" %}</h2>
+      <span class="badge badge-submitted">{% tr "Prototype Auth" "প্রোটোটাইপ অথেন্টিকেশন" %}</span>
+    </div>
+
+    <!-- Quick Demo Role Switcher for Foundation Evaluation -->
+    <div style="background-color: #f8fafc; border: 1px dashed var(--border-color); border-radius: var(--radius-md); padding: 1.25rem; margin-bottom: 1.5rem;">
+      <h4 style="font-size: 0.95rem; margin-bottom: 0.5rem; color: var(--secondary-color);">
+        {% tr "🚀 Fast Testing: Select a Role to Preview Dashboard" "🚀 দ্রুত পরীক্ষণ: ড্যাশবোর্ড দেখার জন্য একটি রোল নির্বাচন করুন" %}
+      </h4>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+        {% tr "Since actual database models and users are in prototype foundation phase, you can jump directly into any role view:" "যেহেতু প্রোটোটাইপ ফাউন্ডেশন পর্বে ডাটাবেস মডেল সংরক্ষিত হচ্ছে, আপনি সরাসরি রোল ড্যাশবোর্ডে প্রবেশ করতে পারেন:" %}
+      </p>
+
+      <form method="POST" action="{% url 'accounts:login' %}">
+        {% csrf_token %}
+        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+          <button type="submit" name="demo_role" value="citizen" class="btn btn-secondary btn-sm">
+            {% tr "Citizen" "নাগরিক" %}
+          </button>
+          <button type="submit" name="demo_role" value="dlao_officer" class="btn btn-secondary btn-sm">
+            {% tr "DLAO Officer" "ডিএলএও কর্মকর্তা" %}
+          </button>
+          <button type="submit" name="demo_role" value="support_staff" class="btn btn-secondary btn-sm">
+            {% tr "Support Staff" "সহায়ক কর্মী" %}
+          </button>
+          <button type="submit" name="demo_role" value="udc_operator" class="btn btn-secondary btn-sm">
+            {% tr "UDC Operator" "ইউডিসি উদ্যোক্তা" %}
+          </button>
+          <button type="submit" name="demo_role" value="panel_lawyer" class="btn btn-secondary btn-sm">
+            {% tr "Panel Lawyer" "প্যানেল আইনজীবী" %}
+          </button>
+          <button type="submit" name="demo_role" value="mediator" class="btn btn-secondary btn-sm">
+            {% tr "Mediator" "মধ্যস্থতাকারী" %}
+          </button>
+          <button type="submit" name="demo_role" value="helpline_agent" class="btn btn-secondary btn-sm">
+            {% tr "Helpline Agent (16699)" "হেল্পলাইন এজেন্ট" %}
+          </button>
+          <button type="submit" name="demo_role" value="representative" class="btn btn-secondary btn-sm">
+            {% tr "Representative" "প্রতিনিধি" %}
+          </button>
+          <button type="submit" name="demo_role" value="admin" class="btn btn-secondary btn-sm">
+            {% tr "Admin" "অ্যাডমিন" %}
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Standard Django Auth Form -->
+    <form method="POST" action="{% url 'accounts:login' %}">
+      {% csrf_token %}
+      <div class="form-group">
+        <label class="form-label" for="username">{% tr "Username or Mobile Number" "ব্যবহারকারীর নাম বা মোবাইল নম্বর" %}</label>
+        <input type="text" id="username" name="username" class="form-input" placeholder="e.g. officer_dhaka or 01700000000" autocomplete="username">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="password">{% tr "Password" "পাসওয়ার্ড" %}</label>
+        <input type="password" id="password" name="password" class="form-input" placeholder="••••••••" autocomplete="current-password">
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem;">
+        <a href="{% url 'core:landing' %}" class="btn btn-secondary">
+          {% tr "Cancel" "বাতিল" %}
+        </a>
+        <button type="submit" class="btn btn-primary">
+          {% tr "Sign In" "প্রবেশ করুন" %}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

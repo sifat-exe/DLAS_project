@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+{% load dlas_tags %}
+
+{% block title %}
+  {% tr "Panel Lawyer Workspace - DLAS" "প্যানেল আইনজীবী কর্মক্ষেত্র - ডিএলএএস" %}
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+  <div>
+    <h2>{% tr "Panel Lawyer Worklist" "প্যানেল আইনজীবী কার্যতালিকা" %}</h2>
+    <p style="color: var(--text-muted); font-size: 0.9rem;">
+      {% tr "Review assigned legal-aid cases, submit acceptance/declinations, and record proceeding updates." "বরাদ্দকৃত মামলা পর্যালোচনা, গ্রহণ/প্রত্যাখ্যান এবং শুনানির অগ্রগতি লিপিবদ্ধকরণ।" %}
+    </p>
+  </div>
+  <div>
+    <span class="role-pill">{% tr "Role: Panel Lawyer" "রোল: প্যানেল আইনজীবী" %}</span>
+  </div>
+</div>
+
+<div class="grid-3" style="margin-bottom: 1.5rem;">
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">{% tr "Pending Assignments" "অপেক্ষমাণ বরাদ্দ" %}</span>
+      <span class="badge badge-under-review">{{ pending_count|default:0 }}</span>
+    </div>
+    <p class="form-hint">{% tr "Awaiting your acceptance or declination" "আপনার সিদ্ধান্ত (গ্রহণ/প্রত্যাখ্যান)-এর অপেক্ষায়" %}</p>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">{% tr "Active Represented Cases" "চলমান প্রতিনিধিত্বকারী মামলা" %}</span>
+      <span class="badge badge-accepted">{{ active_count|default:0 }}</span>
+    </div>
+    <p class="form-hint">{% tr "Accepted cases under current proceeding" "আদালতে বা আইনি প্রক্রিয়ায় সক্রিয় মামলা" %}</p>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">{% tr "Completed / Declined" "নিষ্পত্তিকৃত / বাতিল" %}</span>
+      <span class="badge badge-closed">{{ declined_count|default:0 }}</span>
+    </div>
+    <p class="form-hint">{% tr "Historical assignment records" "পূর্বের মামলার বিবরণ" %}</p>
+  </div>
+</div>
+
+<!-- Section 1: Pending Assignments (Requires Lawyer Accept/Decline) -->
+{% if pending_assignments %}
+  <div class="card" style="border-top: 3px solid var(--warning-color);">
+    <div class="card-header">
+      <h3 class="card-title" style="color: var(--warning-color);">
+        ⚠️ {% tr "Pending Case Assignments (Response Required)" "অপেক্ষমাণ মামলা বরাদ্দ (প্রতিক্রিয়া আবশ্যক)" %}
+      </h3>
+      <span class="badge badge-under-review">{{ pending_count }}</span>
+    </div>
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>{% tr "Case ID" "কেস আইডি" %}</th>
+            <th>{% tr "Citizen" "নাগরিক" %}</th>
+            <th>{% tr "Legal Problem" "আইনি সমস্যা" %}</th>
+            <th>{% tr "Assigned By" "নিয়োগকারী" %}</th>
+            <th>{% tr "Assigned Date" "বরাদ্দের তারিখ" %}</th>
+            <th>{% tr "Decision Action" "সিদ্ধান্ত গ্রহণ" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for asgn in pending_assignments %}
+            <tr>
+              <td><strong>{{ asgn.case.case_id }}</strong></td>
+              <td>{{ asgn.case.application.name }}</td>
+              <td>{{ asgn.case.application.legal_problem|truncatewords:6 }}</td>
+              <td>{{ asgn.assigned_by.username }}</td>
+              <td>{{ asgn.assigned_at|date:"d M Y" }}</td>
+              <td>
+                <div style="display: flex; gap: 0.4rem;">
+                  <form method="POST" action="{% url 'lawyers:respond_assignment' asgn.id %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="decision" value="accept">
+                    <button type="submit" class="btn btn-primary btn-sm">
+                      ✓ {% tr "Accept" "গ্রহণ" %}
+                    </button>
+                  </form>
+                  <form method="POST" action="{% url 'lawyers:respond_assignment' asgn.id %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="decision" value="decline">
+                    <button type="submit" class="btn btn-danger btn-sm">
+                      ✕ {% tr "Decline" "বাতিল" %}
+                    </button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endif %}
+
+<!-- Section 2: Active Assigned Cases Worklist -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">{% tr "Active Represented Cases" "সক্রিয় আইনি মামলা তালিকা" %}</h3>
+    <span class="badge badge-accepted">{{ active_count|default:0 }}</span>
+  </div>
+
+  {% if active_cases %}
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>{% tr "Case ID" "কেস আইডি" %}</th>
+            <th>{% tr "Client / Citizen" "মক্কেল / নাগরিক" %}</th>
+            <th>{% tr "Legal Problem" "আইনি সমস্যা" %}</th>
+            <th>{% tr "Priority" "অগ্রাধিকার" %}</th>
+            <th>{% tr "Status" "অবস্থা" %}</th>
+            <th>{% tr "Action" "পদক্ষেপ" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for case in active_cases %}
+            <tr>
+              <td><strong style="color: var(--primary-color);">{{ case.case_id }}</strong></td>
+              <td>{{ case.application.name }}</td>
+              <td>{{ case.application.legal_problem|truncatewords:8 }}</td>
+              <td><span class="badge badge-under-review">{{ case.get_priority_display }}</span></td>
+              <td><span class="badge badge-accepted">{{ case.get_status_display }}</span></td>
+              <td>
+                <a href="{% url 'lawyers:case_detail' case.case_id %}" class="btn btn-primary btn-sm">
+                  {% tr "View & Update Case →" "বিবরণ ও আপডেট →" %}
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <div class="empty-state-icon">⚖️</div>
+      <h3>{% tr "No cases currently assigned to you." "বর্তমানে আপনাকে কোনো মামলা বরাদ্দ দেওয়া হয়নি।" %}</h3>
+      <p style="color: var(--text-muted); font-size: 0.9rem;">
+        {% tr "When the DLAO Officer assigns a legal aid matter to your panel profile, it will appear here for review." "ডিএলএও কর্মকর্তা আপনার প্যানেলে মামলা বরাদ্দ দিলে তা এখানে পর্যালোচনার জন্য প্রদর্শিত হবে।" %}
+      </p>
+    </div>
+  {% endif %}
+</div>
+
+<!-- Access Rules Notice (PRD Line 315) -->
+<div class="card" style="border-left: 4px solid var(--primary-color);">
+  <h4 style="color: var(--primary-color); margin-bottom: 0.4rem;">
+    {% tr "Confidentiality & Access Restrictions (PRD Line 315)" "গোপনীয়তা ও তথ্য ব্যবহারের বাধ্যবাধকতা" %}
+  </h4>
+  <p style="font-size: 0.88rem; color: var(--text-secondary);">
+    {% tr "Lawyers have restricted access limited to case proceedings and authorized documents. Lawyers can never modify citizen contact details, change audit history, or reassign cases." "আইনজীবীদের প্রবেশাধিকার শুধুমাত্র মামলার আইনি কার্যক্রম এবং অনুমোদিত নথির মধ্যে সীমাবদ্ধ। আবেদনকারীর নিরাপদ যোগাযোগের তথ্য বা অডিট হিস্টোরি পরিবর্তন আইনত নিষিদ্ধ।" %}
+  </p>
+</div>
+{% endblock %}

@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+{% load dlas_tags %}
+
+{% block title %}
+  {% tr "DLAS - Digital Legal Aid System | Home" "ডিএলএএস - ডিজিটাল আইনি সহায়তা ব্যবস্থা | নীড়পাতা" %}
+{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero">
+  <h1>{% tr "Digital Legal Aid System (DLAS)" "ডিজিটাল লিগ্যাল এইড সিস্টেম (ডিএলএএস)" %}</h1>
+  <p>
+    {% tr "A unified digital legal-aid platform connecting citizens to justice through one case record across all channels — web, Union Digital Centres (UDC), helpline, and office walk-ins." "নাগরিকদের জন্য একটি সমন্বিত আইনি সহায়তা প্ল্যাটফর্ম — ওয়েব, ইউনিয়ন ডিজিটাল সেন্টার (ইউডিসি), হেল্পলাইন এবং সরাসরি অফিস সাক্ষাতের মাধ্যমে একটি একক মামলা রেকর্ডে সেবা।" %}
+  </p>
+  <div class="hero-actions">
+    <a href="{% url 'dashboard:citizen' %}" class="btn btn-primary" style="background-color: #ffffff; color: var(--primary-color);">
+      {% tr "Citizen Access / নতুন আবেদন" "নাগরিক প্রবেশ / New Application" %}
+    </a>
+    <a href="{% url 'dashboard:index' %}" class="btn btn-outline" style="border-color: #ffffff; color: #ffffff;">
+      {% tr "Explore Role Dashboards" "রোল ড্যাশবোর্ডসমূহ দেখুন" %}
+    </a>
+    <a href="{% url 'accounts:login' %}" class="btn btn-secondary">
+      {% tr "Staff / Official Login" "কর্মকর্তা / প্যানেল লগইন" %}
+    </a>
+  </div>
+</section>
+
+<!-- Safe Contact Notice (PRD Req 43-44) -->
+<div class="safe-contact-box">
+  <strong>{% tr "Safe Contact Protection:" "নিরাপদ যোগাযোগ সতর্কতা:" %}</strong>
+  {% tr "DLAS records sensitive domestic and civil matters with strict privacy protections. Contact is only initiated via verified safe channels and times designated by the applicant." "ডিএলএএস অত্যন্ত সংবেদনশীল পারিবারিক ও দেওয়ানি বিষয়ে কঠোর গোপনীয়তা রক্ষা করে। শুধুমাত্র আবেদনকারী কর্তৃক নির্ধারিত নিরাপদ সময় ও মাধ্যমেই যোগাযোগ করা হয়।" %}
+</div>
+
+<!-- Architecture & Principles Grid -->
+<div class="grid-3" style="margin-bottom: 2rem;">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">{% tr "Unified Case Record" "একীভূত মামলা রেকর্ড" %}</h3>
+      <span class="badge badge-accepted">{% tr "Core Principle" "মূল নীতি" %}</span>
+    </div>
+    <p style="font-size: 0.95rem; color: var(--text-secondary);">
+      {% tr "ONE application + ONE database + ONE case record + MANY access doors. Application ID generated on intake; Case ID generated only upon DLAO officer acceptance." "এক আবেদন + এক ডাটাবেস + এক মামলা রেকর্ড + বহুমুখী প্রবেশদ্বার। আবেদনের সময় অ্যাপ্লিকেশন আইডি এবং কর্মকর্তা গ্রহণের পর কেস আইডি তৈরি হয়।" %}
+    </p>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">{% tr "Immutable Audit Trail" "অপরিবর্তনীয় অডিট ট্রেইল" %}</h3>
+      <span class="badge badge-in-progress">CaseEvent</span>
+    </div>
+    <p style="font-size: 0.95rem; color: var(--text-secondary);">
+      {% tr "Every consequential decision is recorded in an append-only CaseEvent log with actor, role, channel, and provenance — protecting transparency." "প্রতিটি গুরুত্বপূর্ণ পদক্ষেপ অপরিবর্তনীয় CaseEvent লগে সুরক্ষিত থাকে যার মধ্যে ব্যবহারকারী, ভূমিকা, চ্যানেল ও তথ্যসূত্র লিপিবদ্ধ থাকে।" %}
+    </p>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">{% tr "Human Authority Only" "মানুষের চূড়ান্ত সিদ্ধান্ত" %}</h3>
+      <span class="badge badge-under-review">{% tr "Ethical AI" "নীতিমালা" %}</span>
+    </div>
+    <p style="font-size: 0.95rem; color: var(--text-secondary);">
+      {% tr "AI acts solely as an assistive service for extraction and matching. No AI algorithm can reject, close, merge, or decide eligibility." "এআই শুধুমাত্র তথ্য নিষ্কাশন ও সহায়ক কাজে ব্যবহৃত হয়। কোনো কৃত্রিম বুদ্ধিমত্তা সরাসরি মামলা গ্রহণ, বাতিল বা নিষ্পত্তি করতে পারে না।" %}
+    </p>
+  </div>
+</div>
+
+<!-- Quick Access Portal Section -->
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title">{% tr "Prototype Role Portals (Quick Testing)" "প্রোটোটাইপ রোল পোর্টালসমূহ (পরীক্ষণ)" %}</h2>
+    <span class="badge badge-simulated">{% tr "MVP Phase 1" "এমভিপি প্রথম ধাপ" %}</span>
+  </div>
+  <p style="color: var(--text-secondary); margin-bottom: 1.25rem;">
+    {% tr "Access any of the 9 authorized stakeholder dashboards directly to review workflow interfaces:" "কার্যপ্রবাহ পর্যালোচনা করতে যেকোনো ৯টি অনুমোদিত স্টেকহোল্ডার ড্যাশবোর্ডে সরাসরি প্রবেশ করুন:" %}
+  </p>
+  <div class="grid-3">
+    <a href="{% url 'dashboard:citizen' %}" class="role-card">
+      <div class="role-card-title">{% tr "1. Citizen Portal" "১. নাগরিক পোর্টাল" %}</div>
+      <div class="role-card-desc">{% tr "Submit application, check status with Application ID, view assigned case." "আবেদন জমা, অ্যাপ্লিকেশন আইডি দিয়ে অবস্থা যাচাই ও মামলা পর্যবেক্ষণ।" %}</div>
+      <span class="btn btn-outline btn-sm">{% tr "Open Dashboard →" "ড্যাশবোর্ড খুলুন →" %}</span>
+    </a>
+    <a href="{% url 'dashboard:officer' %}" class="role-card">
+      <div class="role-card-title">{% tr "2. DLAO Officer" "২. ডিএলএও কর্মকর্তা" %}</div>
+      <div class="role-card-desc">{% tr "Intake queue review, accept/reject, assign panel lawyer, refer cases." "মামলার কিউ পর্যালোচনা, গ্রহণ/প্রত্যাখ্যান, আইনজীবী নিয়োগ ও রেফারেল।" %}</div>
+      <span class="btn btn-outline btn-sm">{% tr "Open Dashboard →" "ড্যাশবোর্ড খুলুন →" %}</span>
+    </a>
+    <a href="{% url 'dashboard:support_staff' %}" class="role-card">
+      <div class="role-card-title">{% tr "3. Support Staff" "৩. সহায়ক কর্মী" %}</div>
+      <div class="role-card-desc">{% tr "Search case history, assist intake, verify uploaded document status." "মামলার ইতিহাস অনুসন্ধান, কার্যক্রমে সহায়তা ও নথি যাচাই।" %}</div>
+      <span class="btn btn-outline btn-sm">{% tr "Open Dashboard →" "ড্যাশবোর্ড খুলুন →" %}</span>
+    </a>
+    <a href="{% url 'dashboard:udc_operator' %}" class="role-card">
+      <div class="role-card-title">{% tr "4. UDC Operator" "৪. ইউডিসি উদ্যোক্তা" %}</div>
+      <div class="role-card-desc">{% tr "Assisted intake for rural citizens, consent capture, review read-back." "গ্রামীণ নাগরিকদের সহায়তা, সম্মতি গ্রহণ ও পুনরায় পাঠ করে শোনানো।" %}</div>
+      <span class="btn btn-outline btn-sm">{% tr "Open Dashboard →" "ড্যাশবোর্ড খুলুন →" %}</span>
+    </a>
+    <a href="{% url 'dashboard:panel_lawyer' %}" class="role-card">
+      <div class="role-card-title">{% tr "5. Panel Lawyer" "৫. প্যানেল আইনজীবী" %}</div>
+      <div class="role-card-desc">{% tr "Worklist of assigned cases, accept/decline, hearing notes, status update." "বরাদ্দকৃত মামলা তালিকা, গ্রহণ/প্রত্যাখ্যান, শুনানির তথ্য ও অগ্রগতি।" %}</div>
+      <span class="btn btn-outline btn-sm">{% tr "Open Dashboard →" "ড্যাশবোর্ড খুলুন →" %}</span>
+    </a>
+    <a href="{% url 'dashboard:mediator' %}" class="role-card">
+      <div class="role-card-title">{% tr "6. Mediator" "৬. মধ্যস্থতাকারী" %}</div>
+      <div class="role-card-desc">{% tr "Mediation sessions, schedule hybrid/in-person ADR, record final outcomes." "মধ্যস্থতা সেশন, শুনানির তারিখ নির্ধারণ ও চূড়ান্ত নিষ্পত্তি লিপিবদ্ধকরণ।" %}</div>
+      <span class="btn btn-outline btn-sm">{% tr "Open Dashboard →" "ড্যাশবোর্ড খুলুন →" %}</span>
+    </a>
+    <a href="{% url 'dashboard:helpline_agent' %}" class="role-card">
+      <div class="role-card-title">{% tr "7. Helpline Agent (16699)" "৭. হেল্পলাইন এজেন্ট (১৬৬৯৯)" %}</div>
+      <div class="role-card-desc">{% tr "Simulated 16699 call logging, safe contact verification, status lookup." "সিমুলেটেড ১৬৬৯৯ কল গ্রহণ, নিরাপদ যোগাযোগের তথ্য ও অবস্থা যাচাই।" %}</div>
+      <span class="btn btn-outline btn-sm">{% tr "Open Dashboard →" "ড্যাশবোর্ড খুলুন →" %}</span>
+    </a>
+    <a href="{% url 'dashboard:representative' %}" class="role-card">
+      <div class="role-card-title">{% tr "8. Representative" "৮. প্রতিনিধি" %}</div>
+      <div class="role-card-desc">{% tr "File intake on behalf of family or community member with consent." "সম্মতি সাপেক্ষে পরিবারের সদস্য বা আত্মীয়ের পক্ষে আবেদন পেশ।" %}</div>
+      <span class="btn btn-outline btn-sm">{% tr "Open Dashboard →" "ড্যাশবোর্ড খুলুন →" %}</span>
+    </a>
+    <a href="{% url 'dashboard:admin' %}" class="role-card">
+      <div class="role-card-title">{% tr "9. System Admin" "৯. সিস্টেম অ্যাডমিন" %}</div>
+      <div class="role-card-desc">{% tr "System health, audit log monitor, mock service configuration." "সিস্টেম পর্যবেক্ষণ, অডিট লগ মনিটর ও সিমুলেটেড সার্ভিস পরিচালনা।" %}</div>
+      <span class="btn btn-outline btn-sm">{% tr "Open Dashboard →" "ড্যাশবোর্ড খুলুন →" %}</span>
+    </a>
+  </div>
+</div>
+{% endblock %}
