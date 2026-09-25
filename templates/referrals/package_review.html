@@ -1,0 +1,203 @@
+{% extends 'base.html' %}
+{% load dlas_tags %}
+
+{% block title %}
+  {% tr "Review Referral Package" "রেফারাল প্যাকেজ পর্যালোচনা" %} - {{ case_record.case_id }} - DLAS
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-header" style="margin-bottom: 1.5rem;">
+  <div>
+    <h2>
+      📦 {% tr "Referral Package" "রেফারাল প্যাকেজ" %} — {% tr "Pre-Submission Review" "চূড়ান্ত প্রেরণের পূর্বে পর্যালোচনা" %}
+    </h2>
+    <p style="color: var(--text-muted); font-size: 0.9rem;">
+      {% tr "Carefully verify all referral package details before confirming official transmission." "সরকারিভাবে প্রেরণের পূর্বে রেফারাল প্যাকেজের সমস্ত তথ্য পুঙ্খানুপুঙ্খভাবে যাচাই করুন।" %}
+    </p>
+  </div>
+  <div>
+    <a href="{% url 'cases:officer_case_detail' case_record.case_id %}" class="btn btn-secondary">
+      &larr; {% tr "Cancel & Back to Case" "বাতিল করে মামলায় ফিরুন" %}
+    </a>
+  </div>
+</div>
+
+<div class="grid-2" style="grid-template-columns: 2fr 1fr; gap: 1.5rem; align-items: start;">
+  <!-- Left Column: Package Details -->
+  <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+    <!-- Section 1: Case Information -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          📋 {% tr "Case Information" "মামলার তথ্য" %}
+        </h3>
+      </div>
+      <table class="table" style="margin-bottom: 0;">
+        <tbody>
+          <tr>
+            <td style="width: 35%; color: var(--text-muted); font-weight: 600;">{% tr "Case ID" "মামলা নম্বর" %}</td>
+            <td><strong style="color: var(--primary-color);">{{ case_record.case_id }}</strong></td>
+          </tr>
+          <tr>
+            <td style="color: var(--text-muted); font-weight: 600;">{% tr "Application ID" "আবেদন নম্বর" %}</td>
+            <td>{{ case_record.application.application_id }}</td>
+          </tr>
+          <tr>
+            <td style="color: var(--text-muted); font-weight: 600;">{% tr "Applicant Name" "আবেদনকারীর নাম" %}</td>
+            <td><strong>{{ case_record.application.name }}</strong></td>
+          </tr>
+          <tr>
+            <td style="color: var(--text-muted); font-weight: 600;">{% tr "Contact Information" "যোগাযোগের নম্বর" %}</td>
+            <td>
+              {{ case_record.application.mobile_number }}
+              {% if case_record.application.safe_contact_number %}
+                <br><small style="color: #047857;">🛡️ {% tr "Safe Alternative" "নিরাপদ বিকল্প নম্বর" %}: {{ case_record.application.safe_contact_number }}</small>
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <td style="color: var(--text-muted); font-weight: 600;">{% tr "Legal Problem" "আইনি সমস্যা" %}</td>
+            <td><span class="badge badge-under-review">{{ case_record.application.get_legal_problem_display }}</span></td>
+          </tr>
+          <tr>
+            <td style="color: var(--text-muted); font-weight: 600;">{% tr "Incident Description" "ঘটনার বিবরণ" %}</td>
+            <td>{{ case_record.application.incident_description|truncatewords:40 }}</td>
+          </tr>
+          <tr>
+            <td style="color: var(--text-muted); font-weight: 600;">{% tr "Priority & Status" "অগ্রাধিকার ও বর্তমান অবস্থা" %}</td>
+            <td>
+              <span class="badge {% if case_record.priority == 'URGENT' %}badge-emergency{% else %}badge-accepted{% endif %}">
+                {{ case_record.get_priority_display }}
+              </span>
+              &bull;
+              <span class="badge badge-in-progress">{{ case_record.get_status_display }}</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="color: var(--text-muted); font-weight: 600;">{% tr "Intake Channel & Provenance" "উৎস ও সত্যতা যাচাই" %}</td>
+            <td>
+              {{ case_record.application.get_preferred_channel_display }}
+              {% if case_record.application.provenance_statement_language %}
+                &bull; <small style="color: var(--text-muted);">{{ case_record.application.provenance_statement_language|upper }}</small>
+              {% endif %}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Section 2: Referral Details -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          🏢 {% tr "Referral Mandate & Instructions" "রেফারাল নির্দেশনা ও বিবরণ" %}
+        </h3>
+      </div>
+      <table class="table" style="margin-bottom: 0;">
+        <tbody>
+          <tr>
+            <td style="width: 35%; color: var(--text-muted); font-weight: 600;">{% tr "Destination Authority" "প্রাপক অফিস / সংস্থা" %}</td>
+            <td><strong style="font-size: 1.05rem; color: #1e3a8a;">{{ destination }}</strong></td>
+          </tr>
+          <tr>
+            <td style="color: var(--text-muted); font-weight: 600;">{% tr "Referral Reason" "রেফারালের কারণ" %}</td>
+            <td>{{ reason }}</td>
+          </tr>
+          <tr>
+            <td style="color: var(--text-muted); font-weight: 600;">{% tr "Expected Action" "প্রত্যাশিত পদক্ষেপ" %}</td>
+            <td>{{ expected_action }}</td>
+          </tr>
+          <tr>
+            <td style="color: var(--text-muted); font-weight: 600;">{% tr "Deadline" "সময়সীমা" %}</td>
+            <td><strong style="color: #dc2626;">{{ deadline }}</strong></td>
+          </tr>
+          <tr>
+            <td style="color: var(--text-muted); font-weight: 600;">{% tr "Assigned Receiving Officer" "দায়িত্বপ্রাপ্ত প্রাপক কর্মকর্তা" %}</td>
+            <td>
+              {% if assigned_officer %}
+                <strong>{{ assigned_officer.get_full_name|default:assigned_officer.username }}</strong> ({{ assigned_officer.username }})
+              {% else %}
+                <span style="color: var(--text-muted);">{% tr "Auto-selected upon transmission" "প্রেরণকালে স্বয়ংক্রিয়ভাবে বরাদ্দকৃত" %}</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% if package_notes %}
+            <tr>
+              <td style="color: var(--text-muted); font-weight: 600;">{% tr "Package Notes" "প্যাকেজ নোট" %}</td>
+              <td>{{ package_notes }}</td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Section 3: Referenced Documents -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          📎 {% tr "Referenced Documents" "সংযুক্ত নথিপত্র" %}
+        </h3>
+      </div>
+      {% if documents %}
+        <ul style="list-style: none; padding: 0; margin: 0;">
+          {% for doc in documents %}
+            <li style="padding: 0.6rem 0; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <strong>📄 {{ doc.title }}</strong>
+                {% if doc.description %}<br><small style="color: var(--text-muted);">{{ doc.description }}</small>{% endif %}
+              </div>
+              <div>
+                <span class="badge badge-accepted">{{ doc.get_status_display }}</span>
+              </div>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p style="color: var(--text-muted); margin: 0; font-size: 0.9rem;">
+          {% tr "No individual documents specifically selected; general case file references will be included." "নির্দিষ্ট কোনো পৃথক নথি নির্বাচন করা হয়নি; সাধারণ মামলা নথি সংযুক্ত থাকবে।" %}
+        </p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Right Column: Confirmation Box -->
+  <div>
+    <div class="card" style="border-top: 4px solid var(--primary-color); position: sticky; top: 1rem;">
+      <div class="card-header">
+        <h3 class="card-title">
+          ✍️ {% tr "Confirm Referral" "রেফারাল নিশ্চিতকরণ" %}
+        </h3>
+      </div>
+      <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 1.25rem;">
+        {% tr "Once confirmed, the official referral package will be locked, an initial acknowledgement task will be assigned, and an immutable CaseEvent audit record will be logged." "নিশ্চিত করার পর, সরকারি রেফারাল প্যাকেজ তৈরি হবে, প্রাপ্তিস্বীকারের সময়সীমা চালু হবে এবং অডিট ট্রেইলে অপরিবর্তনীয় রেকর্ড সংরক্ষিত হবে।" %}
+      </p>
+
+      <form method="POST" action="{% url 'cases:officer_case_detail' case_record.case_id %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="confirm_referral">
+        <input type="hidden" name="destination" value="{{ destination }}">
+        <input type="hidden" name="reason" value="{{ reason }}">
+        <input type="hidden" name="expected_action" value="{{ expected_action }}">
+        <input type="hidden" name="deadline" value="{{ deadline }}">
+        {% if assigned_officer %}
+          <input type="hidden" name="assigned_officer_id" value="{{ assigned_officer.id }}">
+        {% endif %}
+        <input type="hidden" name="package_notes" value="{{ package_notes }}">
+        <input type="hidden" name="included_document_ids" value="{{ included_document_ids }}">
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-bottom: 0.75rem; font-weight: 700; padding: 0.75rem;">
+          ✓ {% tr "Confirm Referral" "রেফারাল নিশ্চিত করুন" %}
+        </button>
+
+        <a href="{% url 'cases:officer_case_detail' case_record.case_id %}" class="btn btn-secondary" style="width: 100%; text-align: center; margin-bottom: 0.5rem; display: block;">
+          ✏️ {% tr "Edit" "সম্পাদনা" %}
+        </a>
+
+        <a href="{% url 'cases:officer_case_detail' case_record.case_id %}" class="btn btn-danger" style="width: 100%; text-align: center; display: block;" onclick="return confirm('{% tr 'Are you sure you want to cancel this referral preparation?' 'আপনি কি নিশ্চিত যে এই রেফারাল প্রস্তুতি বাতিল করতে চান?' %}');">
+          ✕ {% tr "Cancel" "বাতিল" %}
+        </a>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,5 +1,7 @@
+from datetime import datetime, date
 from django.db import transaction
 from django.utils import timezone
+from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied, ValidationError
 from accounts.models import UserProfile
 from accounts.permissions import has_role, get_user_role, can_access_case
@@ -9,6 +11,39 @@ from referrals.models import Referral
 from mediation.models import Mediation
 from documents.models import Document
 from cases.ai_service import MockAIService
+
+def ensure_aware_datetime(val):
+    """
+    Normalizes a string, date, or naive datetime into a timezone-aware datetime.
+    Prevents RuntimeWarnings when USE_TZ is active.
+    """
+    if not val:
+        return None
+    if isinstance(val, str):
+        val = val.strip()
+        if not val:
+            return None
+        dt = None
+        try:
+            dt = datetime.fromisoformat(val)
+        except ValueError:
+            pass
+        if dt is None:
+            for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M', '%Y-%m-%d'):
+                try:
+                    dt = datetime.strptime(val, fmt)
+                    break
+                except ValueError:
+                    continue
+        if dt is None:
+            return None
+        val = dt
+    elif isinstance(val, date) and not isinstance(val, datetime):
+        val = datetime.combine(val, datetime.min.time())
+
+    if isinstance(val, datetime) and timezone.is_naive(val):
+        val = timezone.make_aware(val, timezone.get_current_timezone())
+    return val
 
 def generate_application_id():
     """
@@ -468,20 +503,47 @@ def request_lawyer_change(case_record, requester, reason="", channel='web'):
     return task
 
 @transaction.atomic
-def create_case_referral(case_record, officer, destination, reason, expected_action, deadline, channel='web'):
+def create_case_referral(
+    case_record,
+    officer,
+    destination,
+    reason,
+    expected_action,
+    deadline,
+    assigned_officer=None,
+    package_notes="",
+    included_document_ids="",
+    channel='web'
+):
     """
-    DLAO officer creates an inter-agency or inter-district referral.
+    DLAO officer creates an inter-agency or inter-district referral package.
     """
     if not has_role(officer, [UserProfile.ROLE_DLAO_OFFICER, UserProfile.ROLE_ADMIN]):
         raise PermissionDenied("Only authorized DLAO officers can refer cases.")
 
+    # Timezone awareness normalization
+    deadline = ensure_aware_datetime(deadline)
+    if not deadline:
+        raise ValidationError("A valid referral deadline is required.")
+
+    # If assigned_officer is not provided, pick another eligible DLAO officer or fallback to officer
+    if not assigned_officer:
+        alternate = User.objects.filter(
+            profile__role=UserProfile.ROLE_DLAO_OFFICER,
+            is_active=True
+        ).exclude(id=officer.id).order_by('id').first()
+        assigned_officer = alternate or officer
+
     referral = Referral.objects.create(
         case=case_record,
         created_by=officer,
+        assigned_officer=assigned_officer,
         destination=destination,
         reason=reason,
         expected_action=expected_action,
         deadline=deadline,
+        package_notes=package_notes or "",
+        included_document_ids=included_document_ids or "",
         status=Referral.STATUS_PENDING,
     )
 
@@ -489,7 +551,35 @@ def create_case_referral(case_record, officer, destination, reason, expected_act
     case_record.save(update_fields=['status', 'updated_at'])
 
     actor_role = get_user_role(officer) or 'dlao_officer'
-    deadline_str = deadline.strftime('%Y-%m-%d') if hasattr(deadline, 'strftime') else str(deadline)
+    deadline_str = deadline.strftime('%Y-%m-%d %H:%M') if hasattr(deadline, 'strftime') else str(deadline)
+
+    # 1. referral_package_created
+    CaseEvent.objects.create(
+        case=case_record,
+        application=case_record.application,
+        actor=officer,
+        actor_role=actor_role,
+        channel=channel,
+        action='referral_package_created',
+        description=f"Referral package prepared for {destination}. Assigned: {assigned_officer.username}. Deadline: {deadline_str}. Reason: {reason}",
+        provenance=CaseEvent.PROVENANCE_STAFF_ENTERED,
+        authority='DLAO Officer',
+    )
+
+    # 2. referral_sent
+    CaseEvent.objects.create(
+        case=case_record,
+        application=case_record.application,
+        actor=officer,
+        actor_role=actor_role,
+        channel=channel,
+        action='referral_sent',
+        description=f"Referral #{referral.id} transmitted to {destination}. Custody assigned to {assigned_officer.username}.",
+        provenance=CaseEvent.PROVENANCE_STAFF_ENTERED,
+        authority='DLAO Officer',
+    )
+
+    # 3. CASE_REFERRED (preserves backward compatibility with existing tests/audit)
     CaseEvent.objects.create(
         case=case_record,
         application=case_record.application,
@@ -501,26 +591,69 @@ def create_case_referral(case_record, officer, destination, reason, expected_act
         provenance=CaseEvent.PROVENANCE_STAFF_ENTERED,
         authority='DLAO Officer',
     )
+
+    # Create initial acknowledgement Task for assigned officer
+    Task.objects.create(
+        case=case_record,
+        assigned_to=assigned_officer,
+        title=f"Acknowledge Referral #{referral.id} ({destination})",
+        description=f"Review referral package for {case_record.case_id} and confirm custody before deadline: {deadline_str}.",
+        due_at=deadline,
+        priority='HIGH',
+        status=Task.STATUS_PENDING,
+    )
+
     return referral
 
 @transaction.atomic
 def acknowledge_referral(referral, user, channel='web'):
     """
     Receiving authority acknowledges referral.
+    Enforces server-side authorization: user must be the assigned officer or admin.
     """
+    # Authorization checks
+    is_admin = has_role(user, [UserProfile.ROLE_ADMIN])
+    is_assigned = (referral.assigned_officer == user)
+    
+    if referral.assigned_officer and not is_assigned and not is_admin:
+        raise PermissionDenied("You are not authorized to acknowledge this referral. Only the assigned officer may acknowledge.")
+
+    if referral.status in [Referral.STATUS_ACKNOWLEDGED, Referral.STATUS_COMPLETED]:
+        raise ValidationError("Referral has already been acknowledged or completed.")
+
     referral.status = Referral.STATUS_ACKNOWLEDGED
     referral.acknowledged_at = timezone.now()
     referral.save(update_fields=['status', 'acknowledged_at'])
 
+    # Close any pending task for this referral
+    Task.objects.filter(
+        case=referral.case,
+        assigned_to=user,
+        title__icontains=f"#{referral.id}"
+    ).update(status=Task.STATUS_COMPLETED, completed_at=referral.acknowledged_at)
+
+    actor_role = get_user_role(user) or 'dlao_officer'
     CaseEvent.objects.create(
         case=referral.case,
         application=referral.case.application,
         actor=user,
-        actor_role=get_user_role(user) or 'dlao_officer',
+        actor_role=actor_role,
         channel=channel,
         action='REFERRAL_ACKNOWLEDGED',
         description=f"Referral to {referral.destination} acknowledged by {user.username}.",
         provenance=CaseEvent.PROVENANCE_STAFF_ENTERED,
+        authority='DLAO Officer',
+    )
+    CaseEvent.objects.create(
+        case=referral.case,
+        application=referral.case.application,
+        actor=user,
+        actor_role=actor_role,
+        channel=channel,
+        action='referral_acknowledged',
+        description=f"Referral to {referral.destination} acknowledged by {user.username}.",
+        provenance=CaseEvent.PROVENANCE_STAFF_ENTERED,
+        authority='DLAO Officer',
     )
     return referral
 
@@ -536,7 +669,7 @@ def return_referral(referral, user, reason="", channel='web'):
         # Create escalation task for DLAO Officer
         Task.objects.create(
             case=referral.case,
-            assigned_to=referral.case.assigned_officer,
+            assigned_to=referral.case.assigned_officer or user,
             title=f"ESCALATION: Referral to {referral.destination} repeatedly returned ({referral.returned_count} times)",
             description=f"Referral returned with reason: {reason}. Consequential review required.",
             due_at=timezone.now() + timezone.timedelta(days=1),
@@ -580,6 +713,165 @@ def complete_referral(referral, user, outcome_notes="", channel='web'):
     return referral
 
 @transaction.atomic
+def check_and_handoff_overdue_referral(referral, actor=None, force=False, channel='system'):
+    """
+    Identifies missed acknowledgement deadline and executes handoff to another eligible officer.
+    Workflow:
+    Referral created -> awaiting acknowledgement -> deadline passes ->
+    system identifies missed deadline -> referral becomes overdue/escalated ->
+    referral is passed to another eligible officer ->
+    new officer is responsible for acknowledgement/follow-up.
+    """
+    now = timezone.now()
+    if not force:
+        if not referral.deadline or referral.deadline >= now:
+            return referral  # Not overdue
+        if referral.status not in [Referral.STATUS_PENDING, Referral.STATUS_REASSIGNED]:
+            return referral  # Already acknowledged/completed/returned
+
+    # 1. Record missed deadline timestamp
+    if not referral.missed_deadline_at:
+        referral.missed_deadline_at = now
+
+    actor_user = actor or referral.created_by
+    actor_role = get_user_role(actor_user) or 'dlao_officer'
+
+    # CaseEvent: referral_deadline_missed
+    CaseEvent.objects.create(
+        case=referral.case,
+        application=referral.case.application,
+        actor=actor_user,
+        actor_role=actor_role,
+        channel=channel,
+        action='referral_deadline_missed',
+        description=(
+            f"Referral #{referral.id} acknowledgement deadline "
+            f"({referral.deadline.strftime('%Y-%m-%d %H:%M') if referral.deadline else 'N/A'}) "
+            f"missed by {referral.assigned_officer.username if referral.assigned_officer else 'assigned officer'}."
+        ),
+        provenance=CaseEvent.PROVENANCE_STAFF_ENTERED,
+        authority='DLAO System',
+    )
+
+    # 2. Select eligible alternate officer
+    # Only eligible officers (role = ROLE_DLAO_OFFICER, active), excluding current assigned_officer
+    eligible_officers = User.objects.filter(
+        profile__role=UserProfile.ROLE_DLAO_OFFICER,
+        is_active=True
+    )
+    if referral.assigned_officer:
+        eligible_officers = eligible_officers.exclude(id=referral.assigned_officer.id)
+
+    # Deterministic selection: order by id
+    next_officer = eligible_officers.order_by('id').first()
+
+    if next_officer:
+        prev_officer = referral.assigned_officer
+        referral.previous_officer = prev_officer
+        referral.assigned_officer = next_officer
+        referral.status = Referral.STATUS_REASSIGNED
+        referral.reassigned_at = now
+        referral.save(update_fields=[
+            'status', 'previous_officer', 'assigned_officer',
+            'reassigned_at', 'missed_deadline_at'
+        ])
+
+        # CaseEvent: referral_escalated
+        CaseEvent.objects.create(
+            case=referral.case,
+            application=referral.case.application,
+            actor=actor_user,
+            actor_role=actor_role,
+            channel=channel,
+            action='referral_escalated',
+            description=f"Referral #{referral.id} escalated due to missed acknowledgement deadline.",
+            provenance=CaseEvent.PROVENANCE_STAFF_ENTERED,
+            authority='DLAO System',
+        )
+
+        # CaseEvent: referral_reassigned
+        CaseEvent.objects.create(
+            case=referral.case,
+            application=referral.case.application,
+            actor=actor_user,
+            actor_role=actor_role,
+            channel=channel,
+            action='referral_reassigned',
+            description=(
+                f"Referral #{referral.id} handed off from "
+                f"{prev_officer.username if prev_officer else 'unassigned'} to {next_officer.username}."
+            ),
+            provenance=CaseEvent.PROVENANCE_STAFF_ENTERED,
+            authority='DLAO System',
+        )
+
+        # CaseEvent: referral_followup_created
+        CaseEvent.objects.create(
+            case=referral.case,
+            application=referral.case.application,
+            actor=actor_user,
+            actor_role=actor_role,
+            channel=channel,
+            action='referral_followup_created',
+            description=f"Follow-up task created for {next_officer.username} to take custody of referral #{referral.id}.",
+            provenance=CaseEvent.PROVENANCE_STAFF_ENTERED,
+            authority='DLAO System',
+        )
+
+        # Create Follow-up Task for new officer
+        orig_deadline_str = referral.deadline.strftime('%Y-%m-%d %H:%M') if referral.deadline else 'N/A'
+        missed_str = referral.missed_deadline_at.strftime('%Y-%m-%d %H:%M') if referral.missed_deadline_at else 'N/A'
+        Task.objects.create(
+            case=referral.case,
+            assigned_to=next_officer,
+            title=f"FOLLOW-UP: Missed Deadline Referral #{referral.id} ({referral.destination})",
+            description=(
+                f"Referral #{referral.id} was escalated and handed off. "
+                f"Previous officer: {prev_officer.username if prev_officer else 'unassigned'}. "
+                f"New responsible officer: {next_officer.username}. "
+                f"Original deadline: {orig_deadline_str}. "
+                f"Missed timestamp: {missed_str}. "
+                f"Required next action: Acknowledge referral custody or begin follow-up."
+            ),
+            due_at=timezone.now() + timezone.timedelta(days=1),
+            priority='HIGH',
+            status=Task.STATUS_PENDING,
+        )
+    else:
+        # No eligible alternate officer
+        referral.status = Referral.STATUS_ESCALATED
+        referral.save(update_fields=['status', 'missed_deadline_at'])
+
+        CaseEvent.objects.create(
+            case=referral.case,
+            application=referral.case.application,
+            actor=actor_user,
+            actor_role=actor_role,
+            channel=channel,
+            action='referral_escalated',
+            description=f"Referral #{referral.id} deadline missed. No eligible alternate officer found. Manual reassignment required.",
+            provenance=CaseEvent.PROVENANCE_STAFF_ENTERED,
+            authority='DLAO System',
+        )
+
+    return referral
+
+def process_overdue_referrals(actor=None):
+    """
+    Finds and processes all pending/reassigned referrals whose deadline has passed.
+    """
+    now = timezone.now()
+    overdue_qs = Referral.objects.filter(
+        deadline__lt=now,
+        status__in=[Referral.STATUS_PENDING, Referral.STATUS_REASSIGNED]
+    )
+    processed = []
+    for ref in overdue_qs:
+        updated_ref = check_and_handoff_overdue_referral(ref, actor=actor)
+        processed.append(updated_ref)
+    return processed
+
+@transaction.atomic
 def initiate_case_mediation(case_record, officer, mediator, mode='in_person', scheduled_at=None, channel='web'):
     """
     DLAO officer or authorized user initiates mediation for a case.
@@ -590,6 +882,8 @@ def initiate_case_mediation(case_record, officer, mediator, mode='in_person', sc
     if not has_role(mediator, [UserProfile.ROLE_MEDIATOR, UserProfile.ROLE_ADMIN]):
         raise ValidationError("Selected user is not an authorized Mediator.")
 
+    # Timezone-aware normalization
+    scheduled_at = ensure_aware_datetime(scheduled_at)
     status = Mediation.STATUS_SCHEDULED if scheduled_at else Mediation.STATUS_PENDING
     mediation = Mediation.objects.create(
         case=case_record,

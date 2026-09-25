@@ -511,17 +511,71 @@ def officer_case_detail(request, case_id):
             except (ValidationError, PermissionDenied) as e:
                 messages.error(request, str(e))
 
-        elif action == 'create_referral':
+        elif action == 'preview_referral':
             destination = request.POST.get('destination', '').strip()
             reason = request.POST.get('reason', '').strip()
             expected_action = request.POST.get('expected_action', '').strip()
             deadline = request.POST.get('deadline')
+            assigned_officer_id = request.POST.get('assigned_officer_id')
+            package_notes = request.POST.get('package_notes', '').strip()
+            doc_ids = request.POST.getlist('document_ids')
+
+            if not (destination and reason and expected_action and deadline):
+                messages.error(request, "All required referral fields (destination, reason, expected action, deadline) must be completed before preview.")
+            else:
+                assigned_officer = None
+                if assigned_officer_id:
+                    assigned_officer = User.objects.filter(id=assigned_officer_id).first()
+                if not assigned_officer:
+                    assigned_officer = User.objects.filter(
+                        profile__role=UserProfile.ROLE_DLAO_OFFICER,
+                        is_active=True
+                    ).exclude(id=request.user.id).order_by('id').first() or request.user
+
+                selected_docs = Document.objects.filter(case=case_record, id__in=doc_ids) if doc_ids else []
+                return render(request, 'referrals/package_review.html', {
+                    'case_record': case_record,
+                    'destination': destination,
+                    'reason': reason,
+                    'expected_action': expected_action,
+                    'deadline': deadline,
+                    'assigned_officer': assigned_officer,
+                    'package_notes': package_notes,
+                    'included_document_ids': ",".join(str(d) for d in doc_ids),
+                    'documents': selected_docs,
+                })
+
+        elif action in ['create_referral', 'confirm_referral']:
+            destination = request.POST.get('destination', '').strip()
+            reason = request.POST.get('reason', '').strip()
+            expected_action = request.POST.get('expected_action', '').strip()
+            deadline = request.POST.get('deadline')
+            assigned_officer_id = request.POST.get('assigned_officer_id')
+            package_notes = request.POST.get('package_notes', '').strip()
+            doc_ids_str = request.POST.get('included_document_ids', '')
+            if not doc_ids_str and request.POST.getlist('document_ids'):
+                doc_ids_str = ",".join(request.POST.getlist('document_ids'))
+
             if not (destination and reason and expected_action and deadline):
                 messages.error(request, "All referral fields (destination, reason, expected action, deadline) are required.")
             else:
                 try:
-                    create_case_referral(case_record, request.user, destination, reason, expected_action, deadline)
-                    messages.success(request, f"Case referred to {destination}.")
+                    assigned_officer = None
+                    if assigned_officer_id:
+                        assigned_officer = User.objects.filter(id=assigned_officer_id).first()
+
+                    create_case_referral(
+                        case_record=case_record,
+                        officer=request.user,
+                        destination=destination,
+                        reason=reason,
+                        expected_action=expected_action,
+                        deadline=deadline,
+                        assigned_officer=assigned_officer,
+                        package_notes=package_notes,
+                        included_document_ids=doc_ids_str,
+                    )
+                    messages.success(request, f"Referral package for {destination} created and transmitted successfully.")
                 except (ValidationError, PermissionDenied) as e:
                     messages.error(request, str(e))
 
@@ -665,6 +719,7 @@ def officer_case_detail(request, case_id):
         'events': events,
         'panel_lawyers': panel_lawyers,
         'mediators': mediators,
+        'dlao_officers': User.objects.filter(profile__role=UserProfile.ROLE_DLAO_OFFICER, is_active=True),
         'referrals': case_record.referrals.all(),
         'tasks': case_record.tasks.all(),
         'mediation': getattr(case_record, 'mediation', None),

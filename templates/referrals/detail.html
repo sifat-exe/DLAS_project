@@ -2,29 +2,50 @@
 {% load dlas_tags %}
 
 {% block title %}
-  {% tr "Referral Record" "রেফারেল রেকর্ড" %} #{{ referral.id }} - DLAS
+  {% tr "Referral Package" "রেফারাল প্যাকেজ" %} #{{ referral.id }} - {{ referral.destination }} - DLAS
 {% endblock %}
 
 {% block content %}
-<div class="dashboard-header">
+<div class="dashboard-header" style="margin-bottom: 1.5rem;">
   <div>
     <h2>
-      {% tr "Referral File" "রেফারেল ফাইল" %}: {{ referral.destination }}
+      📦 {% tr "Referral Package" "রেফারাল প্যাকেজ" %} #{{ referral.id }}: {{ referral.destination }}
       <span class="badge 
         {% if referral.status == 'completed' %}badge-accepted
         {% elif referral.status == 'escalated' %}badge-emergency
+        {% elif referral.status == 'reassigned' %}badge-emergency
         {% elif referral.status == 'acknowledged' %}badge-in-progress
         {% elif referral.status == 'returned' %}badge-under-review
         {% else %}badge-pending{% endif %}">
-        {{ referral.get_status_display }}
+        {% if referral.status == 'pending' %}
+          {% tr "Pending Acknowledgement" "গ্রহণ নিশ্চিতকরণের অপেক্ষায়" %}
+        {% elif referral.status == 'acknowledged' %}
+          {% tr "Acknowledged" "গ্রহণ নিশ্চিত করা হয়েছে" %}
+        {% elif referral.status == 'reassigned' %}
+          {% tr "Reassigned" "অন্য কর্মকর্তার কাছে হস্তান্তর করা হয়েছে" %}
+        {% elif referral.status == 'escalated' %}
+          {% tr "Escalated" "উচ্চতর পদক্ষেপে পাঠানো হয়েছে" %}
+        {% elif referral.status == 'completed' %}
+          {% tr "Completed" "সম্পন্ন" %}
+        {% elif referral.status == 'returned' %}
+          {% tr "Returned" "ফেরত এসেছে" %}
+        {% else %}
+          {{ referral.get_status_display }}
+        {% endif %}
       </span>
+
+      {% if referral.is_overdue and referral.status != 'completed' and referral.status != 'acknowledged' %}
+        <span class="badge badge-emergency" style="background-color: #ef4444; color: white;">
+          ⚠️ {% tr "Overdue" "সময়সীমা অতিক্রান্ত" %}
+        </span>
+      {% endif %}
     </h2>
     <p style="color: var(--text-muted); font-size: 0.9rem;">
       {% tr "Originating Case" "মূল মামলা" %}:
-      <a href="{% url 'cases:officer_case_detail' referral.case.id %}" style="font-weight: 700; color: var(--primary-color);">
+      <a href="{% url 'cases:officer_case_detail' referral.case.case_id %}" style="font-weight: 700; color: var(--primary-color);">
         {{ referral.case.case_id }}
       </a>
-      &bull; {% tr "Created By" "তৈরি করেছেন" %}: {{ referral.created_by.get_full_name|default:referral.created_by.username }}
+      &bull; {% tr "Created By" "রেফারাল তৈরি করেছেন" %}: {{ referral.created_by.get_full_name|default:referral.created_by.username }}
       &bull; {{ referral.created_at|date:"d M Y, h:i A" }}
     </p>
   </div>
@@ -35,108 +56,299 @@
   </div>
 </div>
 
-{% if referral.status == 'escalated' %}
+<!-- Escalation / Handoff Banner -->
+{% if referral.status == 'reassigned' %}
+  <div class="alert alert-danger" style="margin-bottom: 1.5rem; border-left: 5px solid #dc2626; background-color: #fef2f2;">
+    <h4 style="margin: 0 0 0.4rem 0; font-size: 1.05rem; color: #991b1b; display: flex; align-items: center; gap: 0.5rem;">
+      ⚠️ {% tr "Reassigned Referral — Missed Acknowledgement Deadline" "পুনঃহস্তান্তরিত রেফারাল — সময়সীমা অতিক্রান্ত হয়েছিল" %}
+    </h4>
+    <p style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: #7f1d1d;">
+      {% tr "The original acknowledgement deadline expired before the previous officer confirmed receipt. The system escalated and automatically handed off this referral to ensure timely legal protection." "নির্ধারিত সময়সীমা পার হওয়ায় পূর্ববর্তী কর্মকর্তার নিকট থেকে মামলাটি স্বয়ংক্রিয়ভাবে নতুন দায়িত্বপ্রাপ্ত কর্মকর্তার নিকট হস্তান্তর করা হয়েছে।" %}
+    </p>
+    <div style="font-size: 0.88rem; color: #7f1d1d; background: white; padding: 0.75rem; border-radius: 4px; border: 1px solid #fecaca;">
+      <div><strong>{% tr "Previous Officer" "পূর্ববর্তী কর্মকর্তা" %}:</strong> {{ referral.previous_officer.get_full_name|default:referral.previous_officer.username|default:"N/A" }}</div>
+      <div><strong>{% tr "New Officer" "নতুন কর্মকর্তা" %}:</strong> {{ referral.assigned_officer.get_full_name|default:referral.assigned_officer.username }}</div>
+      <div><strong>{% tr "Original Deadline" "মূল সময়সীমা" %}:</strong> {{ referral.deadline|date:"d M Y, h:i A"|default:"N/A" }}</div>
+      <div><strong>{% tr "Missed Deadline Timestamp" "সময়সীমা অতিক্রান্তের সময়" %}:</strong> {{ referral.missed_deadline_at|date:"d M Y, h:i A"|default:"N/A" }}</div>
+      <div><strong>{% tr "Follow-up Next Action" "অনুসরণমূলক পদক্ষেপ" %}:</strong> {% tr "New officer must acknowledge custody and commence immediate liaison with receiving authority." "নতুন কর্মকর্তাকে অবশ্যই দায়িত্ব গ্রহণ নিশ্চিত করে জরুরি পদক্ষেপ শুরু করতে হবে।" %}</div>
+    </div>
+  </div>
+{% elif referral.status == 'escalated' and not referral.assigned_officer %}
+  <div class="alert alert-danger" style="margin-bottom: 1.5rem; border-left: 5px solid #dc2626;">
+    <h4 style="margin: 0 0 0.4rem 0; font-size: 1rem; color: #991b1b;">
+      ⚠️ {% tr "Escalated: Manual Reassignment Required" "উচ্চতর পদক্ষেপে পাঠানো হয়েছে: ম্যানুয়াল পুনঃহস্তান্তর প্রয়োজন" %}
+    </h4>
+    <p style="margin: 0; font-size: 0.88rem; color: #7f1d1d;">
+      {% tr "The acknowledgement deadline was missed, but no alternate eligible officer was available in the system. An administrative supervisor must manually reassign this referral." "প্রাপ্তিস্বীকারের সময়সীমা অতিক্রান্ত হয়েছে এবং সিস্টেমে বিকল্প কোনো কর্মকর্তা উপলব্ধ না থাকায় ম্যানুয়াল পুনঃহস্তান্তর প্রয়োজন।" %}
+    </p>
+  </div>
+{% elif referral.status == 'escalated' %}
   <div class="alert alert-danger" style="margin-bottom: 1.5rem; border-left: 5px solid #dc2626;">
     <h4 style="margin: 0 0 0.4rem 0; font-size: 1rem; color: #991b1b;">
       ⚠️ {% tr "High Priority Escalation: Repeatedly Returned Referral" "উচ্চ অগ্রাধিকার উদ্বেগ: বারবার ফেরত আসা রেফারেল" %}
     </h4>
     <p style="margin: 0; font-size: 0.88rem; color: #7f1d1d;">
-      {% tr "This referral has been returned 2 or more times by external or receiving authorities. An escalation task has been generated for the DLAO Officer to review underlying legal or jurisdictional blockers." "এই রেফারেলটি ২ বা ততোধিক বার ফেরত এসেছে। আইনি বা এখতিয়ারগত বাধা পর্যালোচনার জন্য ডিএলএও কর্মকর্তার নিকট জরুরি টাস্ক পাঠানো হয়েছে।" %}
+      {% tr "This referral has been returned 2 or more times by external or receiving authorities. High-priority officer intervention required." "এই রেফারেলটি ২ বা ততোধিক বার ফেরত এসেছে। আইনি বা এখতিয়ারগত বাধা পর্যালোচনার জন্য জরুরি পর্যালোচনা প্রয়োজন।" %}
     </p>
   </div>
 {% endif %}
 
 <div class="grid-2" style="grid-template-columns: 3fr 2fr; gap: 1.5rem; align-items: start;">
-  <!-- Left Column: Details -->
-  <div class="card">
-    <div class="card-header">
-      <h3 class="card-title">{% tr "Referral Instructions & Mandate" "রেফারেল নির্দেশনা ও বিবরণ" %}</h3>
+  <!-- Left Column: Package Details & Provenance -->
+  <div>
+    <!-- Card 1: Official Referral Package Data -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h3 class="card-title">
+          📋 {% tr "Referral Package Specification" "রেফারাল প্যাকেজের মূল বিবরণ" %}
+        </h3>
+      </div>
+
+      <table class="table" style="margin-bottom: 0;">
+        <tbody>
+          <tr>
+            <td style="width: 38%; color: var(--text-muted); font-weight: 600;">{% tr "Destination Authority" "প্রাপক অফিস / সংস্থা" %}</td>
+            <td><strong style="font-size: 1.05rem; color: #1e3a8a;">{{ referral.destination }}</strong></td>
+          </tr>
+          <tr>
+            <td style="color: var(--text-muted); font-weight: 600;">{% tr "Referral Reason" "রেফারালের কারণ" %}</td>
+            <td>{{ referral.reason }}</td>
+          </tr>
+          <tr>
+            <td style="color: var(--text-muted); font-weight: 600;">{% tr "Expected Action" "প্রত্যাশিত পদক্ষেপ" %}</td>
+            <td>{{ referral.expected_action|default:"N/A" }}</td>
+          </tr>
+          <tr>
+            <td style="color: var(--text-muted); font-weight: 600;">{% tr "Responsible Officer" "দায়িত্বপ্রাপ্ত কর্মকর্তা" %}</td>
+            <td>
+              {% if referral.assigned_officer %}
+                <strong>{{ referral.assigned_officer.get_full_name|default:referral.assigned_officer.username }}</strong>
+                {% if referral.assigned_officer == request.user %}
+                  <span class="badge badge-accepted" style="margin-left: 0.3rem;">{% tr "You" "আপনি" %}</span>
+                {% endif %}
+              {% else %}
+                <span style="color: var(--text-muted);">{% tr "Unassigned / General" "অনির্দিষ্ট" %}</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% if referral.previous_officer %}
+            <tr>
+              <td style="color: var(--text-muted); font-weight: 600;">{% tr "Previous Officer" "পূর্ববর্তী কর্মকর্তা" %}</td>
+              <td>{{ referral.previous_officer.get_full_name|default:referral.previous_officer.username }}</td>
+            </tr>
+          {% endif %}
+          <tr>
+            <td style="color: var(--text-muted); font-weight: 600;">{% tr "Deadline" "সময়সীমা" %}</td>
+            <td>
+              {% if referral.deadline %}
+                <strong style="color: {% if referral.is_overdue %}#dc2626{% else %}#1f2937{% endif %};">
+                  {{ referral.deadline|date:"d M Y, h:i A" }}
+                </strong>
+                {% if referral.is_overdue %}
+                  <span class="badge badge-emergency" style="font-size: 0.75rem; margin-left: 0.4rem;">
+                    {% tr "Overdue" "সময়সীমা অতিক্রান্ত" %}
+                  </span>
+                {% endif %}
+              {% else %}
+                <span style="color: var(--text-muted);">{% tr "Not specified" "নির্দিষ্ট নেই" %}</span>
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <td style="color: var(--text-muted); font-weight: 600;">{% tr "Acknowledgement" "গ্রহণ নিশ্চিতকরণ" %}</td>
+            <td>
+              {% if referral.acknowledged_at %}
+                <span style="color: #047857; font-weight: 700;">
+                  ✓ {% tr "Acknowledged on" "গ্রহণ নিশ্চিত করা হয়েছে" %} {{ referral.acknowledged_at|date:"d M Y, h:i A" }}
+                </span>
+              {% else %}
+                <span style="color: #d97706; font-weight: 600;">
+                  ⏳ {% tr "Pending Acknowledgement" "গ্রহণ নিশ্চিতকরণের অপেক্ষায়" %}
+                </span>
+              {% endif %}
+            </td>
+          </tr>
+          {% if referral.package_notes %}
+            <tr>
+              <td style="color: var(--text-muted); font-weight: 600;">{% tr "Package Notes" "প্যাকেজ নোট" %}</td>
+              <td>{{ referral.package_notes }}</td>
+            </tr>
+          {% endif %}
+          <tr>
+            <td style="color: var(--text-muted); font-weight: 600;">{% tr "Times Returned" "মোট ফেরত সংখ্যা" %}</td>
+            <td>
+              {% if referral.returned_count >= 2 %}
+                <span class="badge badge-emergency">{{ referral.returned_count }} ({% tr "Escalated" "উদ্বেগজনক" %})</span>
+              {% else %}
+                <strong>{{ referral.returned_count }}</strong>
+              {% endif %}
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
-    <table class="table" style="margin-bottom: 1.5rem;">
-      <tbody>
-        <tr>
-          <td style="width: 35%; color: var(--text-muted); font-weight: 600;">{% tr "Destination Authority" "প্রাপক কর্তৃপক্ষ / সংস্থা" %}</td>
-          <td><strong>{{ referral.destination }}</strong></td>
-        </tr>
-        <tr>
-          <td style="color: var(--text-muted); font-weight: 600;">{% tr "Reason for Referral" "রেফারেলের কারণ" %}</td>
-          <td>{{ referral.reason }}</td>
-        </tr>
-        <tr>
-          <td style="color: var(--text-muted); font-weight: 600;">{% tr "Expected Action" "প্রত্যাশিত পদক্ষেপ" %}</td>
-          <td>{{ referral.expected_action|default:"N/A" }}</td>
-        </tr>
-        <tr>
-          <td style="color: var(--text-muted); font-weight: 600;">{% tr "Action Deadline" "পদক্ষেপের সময়সীমা" %}</td>
-          <td>
-            {% if referral.deadline %}
-              <span style="font-weight: 700; color: #b91c1c;">{{ referral.deadline|date:"d M Y" }}</span>
-            {% else %}
-              <span style="color: var(--text-muted);">{% tr "Not specified" "নির্দিষ্ট নেই" %}</span>
-            {% endif %}
-          </td>
-        </tr>
-        <tr>
-          <td style="color: var(--text-muted); font-weight: 600;">{% tr "Times Returned" "মোট ফেরত সংখ্যা" %}</td>
-          <td>
-            {% if referral.returned_count >= 2 %}
-              <span class="badge badge-emergency">{{ referral.returned_count }} ({% tr "Escalated" "উদ্বেগজনক" %})</span>
-            {% else %}
-              <strong>{{ referral.returned_count }}</strong>
-            {% endif %}
-          </td>
-        </tr>
-        <tr>
-          <td style="color: var(--text-muted); font-weight: 600;">{% tr "Acknowledged At" "প্রাপ্তিস্বীকারের সময়" %}</td>
-          <td>
-            {% if referral.acknowledged_at %}
-              {{ referral.acknowledged_at|date:"d M Y, h:i A" }}
-            {% else %}
-              <span style="color: var(--text-muted);">{% tr "Pending Acknowledgment" "প্রাপ্তিস্বীকার অপেক্ষমাণ" %}</span>
-            {% endif %}
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <!-- Card 2: Associated Case Profile & Provenance -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h3 class="card-title">
+          👤 {% tr "Case Information" "মামলার তথ্য" %}
+        </h3>
+      </div>
+      <table class="table" style="margin-bottom: 0;">
+        <tbody>
+          <tr>
+            <td style="width: 38%; color: var(--text-muted); font-weight: 600;">{% tr "Applicant Name" "আবেদনকারীর নাম" %}</td>
+            <td><strong>{{ referral.case.application.name }}</strong></td>
+          </tr>
+          <tr>
+            <td style="color: var(--text-muted); font-weight: 600;">{% tr "Application ID" "আবেদন নম্বর" %}</td>
+            <td>{{ referral.case.application.application_id }}</td>
+          </tr>
+          <tr>
+            <td style="color: var(--text-muted); font-weight: 600;">{% tr "Contact Information" "যোগাযোগ নম্বর" %}</td>
+            <td>
+              {{ referral.case.application.mobile_number }}
+              {% if referral.case.application.safe_contact_number %}
+                <br><small style="color: #047857;">🛡️ {% tr "Safe Alternative" "নিরাপদ বিকল্প নম্বর" %}: {{ referral.case.application.safe_contact_number }}</small>
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <td style="color: var(--text-muted); font-weight: 600;">{% tr "Legal Problem" "আইনি সমস্যা" %}</td>
+            <td><span class="badge badge-under-review">{{ referral.case.application.get_legal_problem_display }}</span></td>
+          </tr>
+          <tr>
+            <td style="color: var(--text-muted); font-weight: 600;">{% tr "Incident Description" "ঘটনার বিবরণ" %}</td>
+            <td>{{ referral.case.application.incident_description }}</td>
+          </tr>
+          <tr>
+            <td style="color: var(--text-muted); font-weight: 600;">{% tr "Case Status & Priority" "বর্তমান অবস্থা ও অগ্রাধিকার" %}</td>
+            <td>
+              <span class="badge {% if referral.case.priority == 'URGENT' %}badge-emergency{% else %}badge-accepted{% endif %}">
+                {{ referral.case.get_priority_display }}
+              </span>
+              &bull;
+              <span class="badge badge-in-progress">{{ referral.case.get_status_display }}</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="color: var(--text-muted); font-weight: 600;">{% tr "Intake Channel" "আবেদনের মাধ্যম" %}</td>
+            <td>
+              {{ referral.case.application.get_preferred_channel_display }}
+              {% if referral.case.application.provenance_statement_language %}
+                &bull; <small style="color: var(--text-muted);">{{ referral.case.application.provenance_statement_language|upper }}</small>
+              {% endif %}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
-    <div style="background-color: var(--background); padding: 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-      <h4 style="font-size: 0.92rem; margin-bottom: 0.5rem; color: var(--primary-color);">
-        {% tr "Associated Case Profile" "সংশ্লিষ্ট মামলা বিবরণ" %}
-      </h4>
-      <p style="font-size: 0.88rem; margin: 0 0 0.4rem 0;">
-        <strong>{% tr "Applicant" "আবেদনকারী" %}:</strong> {{ referral.case.application.full_name }}
-      </p>
-      <p style="font-size: 0.88rem; margin: 0 0 0.4rem 0;">
-        <strong>{% tr "Legal Problem" "আইনি সমস্যা" %}:</strong> {{ referral.case.application.get_legal_problem_display }}
-      </p>
-      <p style="font-size: 0.88rem; margin: 0;">
-        <a href="{% url 'cases:officer_case_detail' referral.case.case_id %}" class="btn btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.8rem; margin-top: 0.5rem;">
-          {% tr "Open Full Case Record" "সম্পূর্ণ মামলার নথিপত্র দেখুন" %} &rarr;
-        </a>
-      </p>
+    <!-- Card 3: Referenced Documents -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h3 class="card-title">
+          📎 {% tr "Documents" "নথি" %}
+        </h3>
+      </div>
+      {% if included_documents %}
+        <ul style="list-style: none; padding: 0; margin: 0;">
+          {% for doc in included_documents %}
+            <li style="padding: 0.6rem 0; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <strong>📄 {{ doc.title }}</strong>
+                {% if doc.description %}<br><small style="color: var(--text-muted);">{{ doc.description }}</small>{% endif %}
+              </div>
+              <div>
+                <span class="badge badge-accepted">{{ doc.get_status_display }}</span>
+                {% if doc.file %}
+                  <a href="{{ doc.file.url }}" target="_blank" class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; margin-left: 0.4rem;">
+                    {% tr "View" "দেখুন" %}
+                  </a>
+                {% endif %}
+              </div>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p style="color: var(--text-muted); margin: 0; font-size: 0.9rem;">
+          {% tr "No specific documents attached to this referral." "এই রেফারেলের সাথে কোনো নির্দিষ্ট নথি সংযুক্ত নেই।" %}
+        </p>
+      {% endif %}
+    </div>
+
+    <!-- Card 4: Referral Lifecycle Audit (CaseEvents) -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          📜 {% tr "Referral History & Lifecycle Audit" "রেফারাল ইতিহাস ও অডিট ট্রেইল" %}
+        </h3>
+      </div>
+      {% if events %}
+        <div style="display: flex; flex-direction: column; gap: 0.6rem;">
+          {% for ev in events %}
+            <div style="font-size: 0.85rem; padding: 0.5rem; background: var(--background); border-radius: 4px; border: 1px solid var(--border-color);">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 0.2rem;">
+                <span class="badge badge-in-progress" style="font-size: 0.75rem;">{{ ev.action }}</span>
+                <span style="color: var(--text-muted); font-size: 0.75rem;">{{ ev.created_at|date:"d M Y, h:i A" }}</span>
+              </div>
+              <p style="margin: 0; color: var(--text-primary);">{{ ev.description }}</p>
+              <small style="color: var(--text-muted);">
+                {% tr "Actor" "সম্পাদনকারী" %}: {{ ev.actor.username|default:"System" }} ({{ ev.actor_role }}) &bull; {% tr "Provenance" "উৎস" %}: {{ ev.provenance }}
+              </small>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p style="color: var(--text-muted); margin: 0; font-size: 0.88rem;">
+          {% tr "No events recorded yet." "এখনো কোনো ঘটনা লিপিবদ্ধ হয়নি।" %}
+        </p>
+      {% endif %}
     </div>
   </div>
 
   <!-- Right Column: Actions -->
   <div>
     {% if referral.status != 'completed' %}
-      <!-- Step 1: Acknowledge -->
-      {% if referral.status == 'pending' %}
+      <!-- Step 1: Acknowledge Referral -->
+      {% if referral.status == 'pending' or referral.status == 'reassigned' %}
         <div class="card" style="margin-bottom: 1.5rem; border-top: 4px solid var(--primary-color);">
           <div class="card-header">
-            <h3 class="card-title">{% tr "1. Acknowledge Receipt" "১. প্রাপ্তিস্বীকার করুন" %}</h3>
+            <h3 class="card-title">{% tr "Acknowledgement" "গ্রহণ নিশ্চিতকরণ" %}</h3>
           </div>
           <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
-            {% tr "Confirm that the receiving office has accepted custody of the referral." "নিশ্চিত করুন যে প্রাপক অফিস রেফারেলটির দায়িত্ব গ্রহণ করেছে।" %}
+            {% tr "Confirm that you have reviewed the package and accepted custody of the referral." "নিশ্চিত করুন যে আপনি প্যাকেজ পর্যালোচনা করেছেন এবং রেফারেলের দায়িত্ব গ্রহণ করেছেন।" %}
           </p>
-          <form method="POST">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="acknowledge">
-            <button type="submit" class="btn btn-primary" style="width: 100%;">
-              ✓ {% tr "Acknowledge Referral" "রেফারেল প্রাপ্তিস্বীকার করুন" %}
-            </button>
-          </form>
+
+          {% if can_acknowledge %}
+            <form method="POST">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="acknowledge">
+              <button type="submit" class="btn btn-primary" style="width: 100%;">
+                ✓ {% tr "Acknowledge Referral" "রেফারাল গ্রহণ নিশ্চিত করুন" %}
+              </button>
+            </form>
+          {% else %}
+            <div class="alert alert-warning" style="font-size: 0.82rem; margin-bottom: 0;">
+              🔒 {% tr "Only the assigned officer (" "শুধুমাত্র দায়িত্বপ্রাপ্ত কর্মকর্তা (" %}{{ referral.assigned_officer.username }}{% tr ") can acknowledge this referral." ") এটি গ্রহণ করতে পারবেন।" %}
+            </div>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      <!-- Step 1b: Follow-up Action for Reassigned Referral -->
+      {% if referral.status == 'reassigned' %}
+        <div class="card" style="margin-bottom: 1.5rem; border-top: 4px solid #ef4444;">
+          <div class="card-header">
+            <h3 class="card-title">{% tr "Follow-up" "অনুসরণমূলক পদক্ষেপ" %}</h3>
+          </div>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.8rem;">
+            {% tr "This referral was escalated due to a missed deadline. As the new responsible officer, begin follow-up actions immediately." "সময়সীমা মিস হওয়ায় এই রেফারালটি হস্তান্তর করা হয়েছে। নতুন দায়িত্বপ্রাপ্ত হিসেবে অবিলম্বে অনুসরণ শুরু করুন।" %}
+          </p>
+          <a href="{% url 'cases:officer_case_detail' referral.case.case_id %}" class="btn btn-secondary" style="width: 100%; text-align: center; display: block; margin-bottom: 0.5rem;">
+            📂 {% tr "Begin Follow-up in Case Workspace" "মামলা ওয়ার্কস্পেসে অনুসরণ শুরু করুন" %}
+          </a>
         </div>
       {% endif %}
 
@@ -146,7 +358,7 @@
           <h3 class="card-title">{% tr "Return Referral" "রেফারেল ফেরত পাঠান" %}</h3>
         </div>
         <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
-          {% tr "If receiving agency cannot fulfill or case lacks jurisdiction, return with reason. Repeated returns (>=2) automatically escalate." "প্রাপক সংস্থা অপারগ হলে বা এখতিয়ার না থাকলে কারণ দর্শিয়ে ফেরত পাঠান। ২ বা ততোধিক বার ফেরত হলে স্বয়ংক্রিয়ভাবে তা অফিসারকে অবহিত করবে।" %}
+          {% tr "If receiving agency cannot fulfill or case lacks jurisdiction, return with reason." "প্রাপক সংস্থা অপারগ হলে বা এখতিয়ার না থাকলে কারণ দর্শিয়ে ফেরত পাঠান।" %}
         </p>
         <form method="POST">
           {% csrf_token %}
@@ -162,7 +374,7 @@
       </div>
 
       <!-- Step 3: Complete Referral -->
-      <div class="card" style="border-top: 4px solid #10b981;">
+      <div class="card" style="margin-bottom: 1.5rem; border-top: 4px solid #10b981;">
         <div class="card-header">
           <h3 class="card-title">{% tr "Complete Referral" "রেফারেল সম্পন্ন করুন" %}</h3>
         </div>
@@ -181,6 +393,26 @@
           </button>
         </form>
       </div>
+
+      <!-- Demo / Test Trigger: Missed-Deadline Handoff -->
+      <div class="card" style="border-top: 4px dashed #9333ea; background: #faf5ff;">
+        <div class="card-header">
+          <h3 class="card-title" style="color: #6b21a8; font-size: 0.95rem;">
+            ⚡ {% tr "Demo: Missed-Deadline Handoff" "ডেমো: সময়সীমা অতিক্রান্ত হস্তান্তর পরীক্ষা" %}
+          </h3>
+        </div>
+        <p style="font-size: 0.82rem; color: #6b21a8; margin-bottom: 0.75rem;">
+          {% tr "Simulate missed acknowledgement deadline and trigger immediate escalation and officer handoff workflow." "সময়সীমা অতিক্রান্ত সিমুলেট করে পরবর্তী কর্মকর্তার কাছে স্বয়ংক্রিয় হস্তান্তর পরীক্ষা করুন।" %}
+        </p>
+        <form method="POST">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="trigger_handoff">
+          <button type="submit" class="btn btn-secondary" style="width: 100%; border-color: #9333ea; color: #6b21a8; font-size: 0.85rem;" onclick="return confirm('{% tr 'Simulate missed deadline and trigger officer handoff?' 'সময়সীমা অতিক্রান্ত সিমুলেট করে কর্মকর্তা হস্তান্তর শুরু করবেন?' %}');">
+            ⚡ {% tr "Simulate Missed Deadline & Handoff" "সময়সীমা অতিক্রান্ত ও হস্তান্তর কার্যকর করুন" %}
+          </button>
+        </form>
+      </div>
+
     {% else %}
       <div class="card" style="border-top: 4px solid #10b981;">
         <div class="card-header">

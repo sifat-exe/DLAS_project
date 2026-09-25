@@ -10,6 +10,7 @@ class Referral(models.Model):
     STATUS_ACKNOWLEDGED = 'acknowledged'
     STATUS_RETURNED = 'returned'
     STATUS_ESCALATED = 'escalated'
+    STATUS_REASSIGNED = 'reassigned'
     STATUS_COMPLETED = 'completed'
 
     STATUS_CHOICES = [
@@ -17,6 +18,7 @@ class Referral(models.Model):
         (STATUS_ACKNOWLEDGED, 'Acknowledged'),
         (STATUS_RETURNED, 'Returned'),
         (STATUS_ESCALATED, 'Escalated'),
+        (STATUS_REASSIGNED, 'Reassigned'),
         (STATUS_COMPLETED, 'Completed'),
     ]
 
@@ -38,6 +40,33 @@ class Referral(models.Model):
     returned_count = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     acknowledged_at = models.DateTimeField(null=True, blank=True)
+
+    # Batch 4: Package details & Missed-deadline handoff fields
+    assigned_officer = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='assigned_referrals'
+    )
+    previous_officer = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='previous_referrals'
+    )
+    reassigned_at = models.DateTimeField(null=True, blank=True)
+    missed_deadline_at = models.DateTimeField(null=True, blank=True)
+    package_notes = models.TextField(blank=True, default='')
+    included_document_ids = models.CharField(max_length=255, blank=True, default='')
+
+    @property
+    def is_overdue(self):
+        from django.utils import timezone
+        if self.status in [self.STATUS_PENDING, self.STATUS_REASSIGNED]:
+            return self.deadline < timezone.now()
+        return False
 
     class Meta:
         ordering = ['-created_at']

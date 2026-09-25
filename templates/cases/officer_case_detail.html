@@ -147,11 +147,10 @@
     <!-- Action 3: Create Referral -->
     <div class="card">
       <div class="card-header">
-        <h4 class="card-title">{% tr "3. Inter-Agency Referral" "৩. আন্তঃসংস্থা বা জেলা রেফারেল" %}</h4>
+        <h4 class="card-title">{% tr "3. Inter-Agency Referral Package" "৩. আন্তঃসংস্থা বা জেলা রেফারাল প্যাকেজ" %}</h4>
       </div>
       <form method="POST" action="{% url 'cases:officer_case_detail' case_record.case_id %}">
         {% csrf_token %}
-        <input type="hidden" name="action" value="create_referral">
         <div class="form-group">
           <label class="form-label">{% tr "Destination Authority / DLAO *" "গন্তব্য অফিস / কর্তৃপক্ষ *" %}</label>
           <input type="text" name="destination" class="form-input" placeholder="e.g. DLAO Narayanganj or Labor Court" required>
@@ -168,9 +167,40 @@
           <label class="form-label">{% tr "Response Deadline *" "সময়সীমা *" %}</label>
           <input type="date" name="deadline" class="form-input" required>
         </div>
-        <button type="submit" class="btn btn-secondary btn-sm" style="width: 100%;">
-          {% tr "Create Official Referral" "রেফারেল জারি করুন" %}
-        </button>
+        <div class="form-group">
+          <label class="form-label">{% tr "Assign Receiving Officer" "দায়িত্বপ্রাপ্ত প্রাপক কর্মকর্তা" %}</label>
+          <select name="assigned_officer_id" class="form-select">
+            <option value="">-- {% tr "Select Officer (or auto-assign)" "কর্মকর্তা বাছাই করুন (বা স্বয়ংক্রিয়)" %} --</option>
+            {% for off in dlao_officers %}
+              <option value="{{ off.id }}">{{ off.get_full_name|default:off.username }} ({{ off.username }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">{% tr "Package Notes" "প্যাকেজ নোট" %}</label>
+          <textarea name="package_notes" class="form-control" rows="2" placeholder="{% tr 'Optional specific instructions or background context...' 'ঐচ্ছিক বিশেষ নির্দেশনা বা প্রেক্ষাপট...' %}"></textarea>
+        </div>
+        {% if documents %}
+          <div class="form-group">
+            <label class="form-label">{% tr "Include Verified Documents" "সংযুক্ত যাচাইকৃত নথিপত্র" %}</label>
+            <div style="max-height: 120px; overflow-y: auto; background: var(--background); padding: 0.5rem; border-radius: 4px; border: 1px solid var(--border-color);">
+              {% for d in documents %}
+                <label style="display: block; font-size: 0.85rem; margin-bottom: 0.3rem; cursor: pointer;">
+                  <input type="checkbox" name="document_ids" value="{{ d.id }}" checked>
+                  {{ d.title }} <small style="color: var(--text-muted);">({{ d.get_status_display }})</small>
+                </label>
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+        <div style="display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.75rem;">
+          <button type="submit" name="action" value="preview_referral" class="btn btn-primary btn-sm" style="width: 100%;">
+            📦 {% tr "Review Referral Package" "রেফারাল প্যাকেজ পর্যালোচনা" %}
+          </button>
+          <button type="submit" name="action" value="create_referral" class="btn btn-secondary btn-sm" style="width: 100%;">
+            {% tr "Direct Confirm & Transmit" "সরাসরি নিশ্চিত ও প্রেরণ করুন" %}
+          </button>
+        </div>
       </form>
     </div>
 

@@ -137,12 +137,43 @@ def get_role_workspace_context(user, role_name=None):
                 'created_at': c.created_at,
             })
 
-        # A4. Overdue referrals
+        # A4. Reassigned referrals handed off to this officer
+        reassigned_to_user = Referral.objects.filter(
+            assigned_officer=user,
+            status=Referral.STATUS_REASSIGNED
+        ).order_by('-reassigned_at')
+        for ref in reassigned_to_user[:3]:
+            deadline_str = ref.deadline.strftime('%d %b %Y, %I:%M %p') if ref.deadline else 'N/A'
+            prev_name = ref.previous_officer.get_full_name() or ref.previous_officer.username if ref.previous_officer else 'previous officer'
+            pending.append({
+                'identifier': f"REF-{ref.id}",
+                'priority': 'URGENT',
+                'priority_label_en': 'Reassigned Referral',
+                'priority_label_bn': 'পুনঃহস্তান্তরিত রেফারাল',
+                'title_en': f"Handed Off Referral #{ref.id}: {ref.destination}",
+                'title_bn': f"হস্তান্তরিত রেফারাল #{ref.id}: {ref.destination}",
+                'detail_en': (
+                    f"Deadline missed by {prev_name}. "
+                    f"Referral handed off to you. Requires immediate acknowledgement and follow-up."
+                ),
+                'detail_bn': (
+                    f"পূর্ববর্তী কর্মকর্তা ({prev_name}) সময়সীমা মিস করায় আপনার নিকট হস্তান্তর করা হয়েছে। "
+                    f"অবিলম্বে গ্রহণ নিশ্চিতকরণ এবং পদক্ষেপ আবশ্যক।"
+                ),
+                'action_text_en': "Acknowledge Referral →",
+                'action_text_bn': "রেফারাল গ্রহণ করুন →",
+                'url': reverse('referrals:referral_detail', kwargs={'referral_id': ref.id}),
+                'created_at': ref.reassigned_at or ref.created_at,
+            })
+
+        # A5. Overdue referrals
         overdue_refs = Referral.objects.filter(
-            Q(deadline__lt=now, status=Referral.STATUS_PENDING) | Q(status=Referral.STATUS_ESCALATED)
-        ).order_by('deadline')
+            Q(deadline__lt=now, status__in=[Referral.STATUS_PENDING, Referral.STATUS_REASSIGNED]) |
+            Q(status=Referral.STATUS_ESCALATED)
+        ).exclude(assigned_officer=user, status=Referral.STATUS_REASSIGNED).order_by('deadline')
         for ref in overdue_refs[:3]:
             ref_id_str = f"REF-{ref.id}"
+            deadline_str = ref.deadline.strftime('%d %b %Y') if ref.deadline else 'N/A'
             pending.append({
                 'identifier': ref_id_str,
                 'priority': 'URGENT',
@@ -150,8 +181,8 @@ def get_role_workspace_context(user, role_name=None):
                 'priority_label_bn': 'সময়োত্তীর্ণ রেফারেল',
                 'title_en': f"Overdue Referral: #{ref.id} ({ref.destination})",
                 'title_bn': f"সময়োত্তীর্ণ রেফারেল: #{ref.id} ({ref.destination})",
-                'detail_en': f"Case {ref.case.case_id} — Deadline passed {ref.deadline.strftime('%d %b %Y')}.",
-                'detail_bn': f"মামলা {ref.case.case_id} — সময়সীমা অতিক্রম: {ref.deadline.strftime('%d %b %Y')}।",
+                'detail_en': f"Case {ref.case.case_id} — Deadline passed {deadline_str}.",
+                'detail_bn': f"মামলা {ref.case.case_id} — সময়সীমা অতিক্রম: {deadline_str}।",
                 'action_text_en': "Follow Up Referral →",
                 'action_text_bn': "রেফারেল অনুসন্ধান →",
                 'url': reverse('referrals:referral_detail', kwargs={'referral_id': ref.id}),
@@ -169,7 +200,27 @@ def get_role_workspace_context(user, role_name=None):
         context['recently_done'] = list(events)
 
         # C. Next Step: Top actionable priority
-        if urgent_cases.exists():
+        if reassigned_to_user.exists():
+            top = reassigned_to_user.first()
+            prev_name = top.previous_officer.get_full_name() or top.previous_officer.username if top.previous_officer else 'previous officer'
+            context['top_next_step'] = {
+                'headline_en': "Acknowledge Reassigned Referral",
+                'headline_bn': "পুনঃহস্তান্তরিত রেফারাল গ্রহণ নিশ্চিত করুন",
+                'instruction_en': (
+                    f"Referral #{top.id} ({top.destination}) was handed off to you after {prev_name} "
+                    f"missed the acknowledgement deadline. Review package and take custody."
+                ),
+                'instruction_bn': (
+                    f"রেফারাল #{top.id} ({top.destination})-এর সময়সীমা পূর্ববর্তী কর্মকর্তা মিস করায় আপনার নিকট হস্তান্তর করা হয়েছে। "
+                    f"প্যাকেজটি পর্যালোচনা করে অবিলম্বে দায়িত্ব গ্রহণ নিশ্চিত করুন।"
+                ),
+                'target_id': f"REF-{top.id}",
+                'url': reverse('referrals:referral_detail', kwargs={'referral_id': top.id}),
+                'action_btn_en': "Acknowledge Referral",
+                'action_btn_bn': "রেফারাল গ্রহণ করুন",
+                'is_urgent': True,
+            }
+        elif urgent_cases.exists():
             top = urgent_cases.first()
             context['top_next_step'] = {
                 'headline_en': "Review This Urgent Case",
