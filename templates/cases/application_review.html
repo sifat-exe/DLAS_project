@@ -94,8 +94,9 @@
     </div>
 
     <!-- Hidden Form to finalize submission -->
-    <form method="POST" action="{% url 'cases:application_create' %}" onsubmit="if(event.submitter && event.submitter.value === 'submit'){ event.submitter.disabled = true; event.submitter.innerText = 'Submitting... / প্রক্রিয়াধীন...'; }">
+    <form method="POST" action="{% url 'cases:application_create' %}" onsubmit="var btn = event.submitter; if(btn && btn.value === 'submit'){ setTimeout(function(){ btn.disabled = true; }, 0); btn.innerText = 'Submitting... / প্রক্রিয়াধীন...'; }">
       {% csrf_token %}
+      <input type="hidden" name="action" id="application-action-input" value="submit">
       <input type="hidden" name="submission_token" value="{{ submission_token }}">
       <input type="hidden" name="name" value="{{ form_data.name }}">
       <input type="hidden" name="phone" value="{{ form_data.phone }}">
@@ -109,11 +110,11 @@
       <input type="hidden" name="language" value="{{ form_data.language }}">
 
       <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 1.25rem;">
-        <button type="submit" name="action" value="edit" class="btn btn-secondary">
+        <button type="submit" name="action" value="edit" onclick="document.getElementById('application-action-input').value = 'edit';" class="btn btn-secondary">
           ← {% tr "Back & Edit Details" "ফিরে যান ও সংশোধন করুন" %}
         </button>
 
-        <button type="submit" name="action" value="submit" class="btn btn-primary" style="background-color: var(--primary-color);">
+        <button type="submit" name="action" value="submit" id="submit-application-btn" class="btn btn-primary" style="background-color: var(--primary-color);">
           ✓ {% tr "Confirm & Submit Application" "নিশ্চিত করুন ও আবেদন জমা দিন" %}
         </button>
       </div>

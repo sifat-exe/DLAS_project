@@ -26,12 +26,17 @@ def index(request):
 
 def citizen_dashboard(request):
     applications = []
+    voice_chat_pending = False
     if request.user.is_authenticated:
         applications = Application.objects.filter(applicant_user=request.user).order_by('-created_at')
+        intake_state = request.session.get('conversational_intake')
+        if intake_state and intake_state.get('status') == 'review':
+            voice_chat_pending = True
     
     return render(request, 'dashboard/citizen.html', {
         'applications': applications,
         'applications_count': len(applications) if applications else 0,
+        'voice_chat_pending': voice_chat_pending,
     })
 
 def officer_dashboard(request):

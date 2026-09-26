@@ -16,10 +16,7 @@
   <div style="display: flex; gap: 0.5rem; align-items: center;">
     <span class="role-pill">{% tr "Role: Citizen" "রোল: নাগরিক" %}</span>
     <a href="{% url 'cases:conversational_intake' %}" class="btn btn-secondary btn-sm">
-      💬 {% tr "Chat Intake" "চ্যাট আবেদন" %}
-    </a>
-    <a href="{% url 'cases:marma_intake' %}" class="btn btn-secondary btn-sm">
-      🗣️ {% tr "Marma Intake" "মারমা আবেদন" %}
+      🎙️ {% tr "Voice Chat" "ভয়েস চ্যাট" %}
     </a>
     <a href="{% url 'cases:offline_queue' %}" class="btn btn-secondary btn-sm">
       🔌 {% tr "Offline Queue" "অফলাইন কিউ" %}
@@ -30,13 +27,13 @@
   </div>
 </div>
 
-{% if request.user.username == 'moyuri' or request.user.username == 'demo_moyuri' or 'moyuri' in request.user.username %}
-<div class="safe-contact-box" style="background: #fdf2f8; border-left: 4px solid #db2777; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+{% if voice_chat_pending %}
+<div class="safe-contact-box" style="background: #eff6ff; border-left: 4px solid #0ea5e9; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
   <div>
-    <strong>🌸 {% tr "Moyuri's Assisted Intake Pending:" "ময়ূরীর সহায়তাকৃত আবেদন নিশ্চিতকরণের অপেক্ষায়:" %}</strong>
-    {% tr "Your legal aid intake details are ready for your personal confirmation." "আপনার আইনি সহায়তার তথ্যাবলী পর্যালোচনার জন্য প্রস্তুত।" %}
+    <strong>🎙️ {% tr "Voice Chat Intake Pending:" "ভয়েস চ্যাট আবেদন নিশ্চিতকরণের অপেক্ষায়:" %}</strong>
+    {% tr "Your assisted intake details are ready for your personal confirmation." "আপনার সহায়তাকৃত আবেদনের তথ্যাবলী পর্যালোচনার জন্য প্রস্তুত।" %}
   </div>
-  <a href="{% url 'cases:moyuri_confirm' %}" class="btn btn-sm btn-primary" style="background: #db2777; border-color: #db2777;">
+  <a href="{% url 'cases:conversational_intake' %}" class="btn btn-sm btn-primary" style="background: #0ea5e9; border-color: #0ea5e9;">
     {% tr "Review & Confirm Now →" "পর্যালোচনা ও নিশ্চিত করুন →" %}
   </a>
 </div>

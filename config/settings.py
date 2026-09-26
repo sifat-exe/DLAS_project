@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -143,3 +144,58 @@ MEDIA_ROOT = BASE_DIR / 'media'
 LOGIN_URL = 'accounts:login'
 LOGIN_REDIRECT_URL = 'dashboard:index'
 LOGOUT_REDIRECT_URL = 'core:landing'
+
+# AI Providers (Gemini & OpenAI) — server-side only. Read from environment / .env / Windows registry.
+# Never expose to templates, static files, or client JS.
+def _resolve_api_key(name):
+    # 1. Existing process environment
+    key = os.environ.get(name, '').strip()
+    if key:
+        return key
+
+    # 2. Local .env file in BASE_DIR (lightweight, zero-dependency)
+    env_file = BASE_DIR / '.env'
+    if env_file.is_file():
+        try:
+            with open(env_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith('#') or '=' not in line:
+                        continue
+                    k, v = line.split('=', 1)
+                    k = k.strip()
+                    v = v.strip().strip('"').strip("'")
+                    if k and k not in os.environ:
+                        os.environ[k] = v
+        except Exception:
+            pass
+        key = os.environ.get(name, '').strip()
+        if key:
+            return key
+
+    # 3. Windows registry (User / System environment variables)
+    if os.name == 'nt':
+        try:
+            import winreg
+            for hive, subkey in (
+                (winreg.HKEY_CURRENT_USER, r'Environment'),
+                (winreg.HKEY_LOCAL_MACHINE, r'SYSTEM\CurrentControlSet\Control\Session Manager\Environment'),
+            ):
+                try:
+                    with winreg.OpenKey(hive, subkey) as reg_key:
+                        val, _ = winreg.QueryValueEx(reg_key, name)
+                        if val and isinstance(val, str) and val.strip():
+                            resolved = val.strip()
+                            os.environ[name] = resolved
+                            return resolved
+                except (FileNotFoundError, OSError):
+                    continue
+        except Exception:
+            pass
+
+    return ''
+
+OPENAI_API_KEY = _resolve_api_key('OPENAI_API_KEY')
+GEMINI_API_KEY = _resolve_api_key('GEMINI_API_KEY')
+
+

@@ -101,5 +101,364 @@
 
   <script src="{% static 'js/main.js' %}"></script>
   {% block extra_js %}{% endblock %}
+
+  {% if user.is_authenticated %}
+  {# =====================================================================
+     UNIVERSAL AI VOICE CHAT — Floating Chat Head
+     Shown on all authenticated pages. API key is NEVER in this JS.
+     All requests go through server-side Django endpoints with CSRF + auth.
+     ===================================================================== #}
+  <div id="ai-chat-widget" style="
+    position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 9999;
+    font-family: inherit;
+  ">
+    {# Collapsed bubble #}
+    <button id="ai-chat-bubble" onclick="dlasChat.toggle()" title="{% tr 'AI Voice Chat' 'AI ভয়েস চ্যাট' %}" style="
+      width: 56px; height: 56px; border-radius: 50%; border: none; cursor: pointer;
+      background: linear-gradient(135deg, #0ea5e9, #6366f1);
+      color: #fff; font-size: 1.4rem; box-shadow: 0 4px 16px rgba(14,165,233,0.45);
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.2s;
+    " onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
+      🎙️
+    </button>
+
+    {# Expanded panel #}
+    <div id="ai-chat-panel" style="
+      display: none; position: absolute; bottom: 68px; right: 0;
+      width: 320px; background: #fff; border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18); overflow: hidden;
+      border: 1px solid #e2e8f0;
+    ">
+      {# Header #}
+      <div style="
+        background: linear-gradient(135deg, #0ea5e9, #6366f1);
+        color: #fff; padding: 0.75rem 1rem;
+        display: flex; justify-content: space-between; align-items: center;
+      ">
+        <div>
+          <strong style="font-size:0.95rem;">🎙️ {% tr "AI Voice Chat" "AI ভয়েস চ্যাট" %}</strong>
+          <div style="font-size:0.72rem; opacity:0.85;" id="ai-chat-label">{% tr "DLAS AI Assistant" "ডিএলএএস AI সহকারী" %}</div>
+        </div>
+        <button onclick="dlasChat.toggle()" style="
+          background:none; border:none; color:#fff; font-size:1.1rem; cursor:pointer; padding:0 0.25rem;
+        ">✕</button>
+      </div>
+
+      {# Messages #}
+      <div id="ai-chat-messages" style="
+        height: 220px; overflow-y: auto; padding: 0.75rem; background: #f8fafc;
+        display: flex; flex-direction: column; gap: 0.5rem;
+      ">
+        <div class="ai-msg ai-msg-assistant" style="
+          background: #e0f2fe; border-radius: 8px; padding: 0.5rem 0.75rem;
+          font-size: 0.85rem; max-width: 90%; align-self: flex-start;
+        ">{% tr "Hello! I'm the DLAS AI assistant. How can I help you today?" "নমস্কার! আমি ডিএলএএস AI সহকারী। আজ আমি আপনার জন্য কী করতে পারি?" %}</div>
+      </div>
+
+      {# Marma action banner — hidden by default, shown when AI detects Marma intent #}
+      <div id="ai-marma-banner" style="
+        display:none; background:#fef3c7; border-top:1px solid #fcd34d;
+        padding:0.5rem 0.75rem; font-size:0.8rem;
+      ">
+        🗺️ {% tr "Marma-assisted intake detected." "মারমা-সহায়তা আবেদন সনাক্ত হয়েছে।" %}
+        <a href="{% url 'cases:marma_intake' %}" style="color:#0ea5e9; font-weight:600; margin-left:0.25rem;">
+          {% tr "Start Marma Intake →" "মারমা আবেদন শুরু করুন →" %}
+        </a>
+      </div>
+
+      {# Simulated / unavailable notice #}
+      <div id="ai-simulated-notice" style="
+        display:none; background:#fef9c3; border-top:1px solid #fde68a;
+        padding:0.4rem 0.75rem; font-size:0.75rem; color:#92400e;
+      ">
+        ⚠️ {% tr "AI service unavailable — using simulated assistance." "AI সেবা পাওয়া যাচ্ছে না — সিমুলেটেড সহায়তা ব্যবহার করা হচ্ছে।" %}
+      </div>
+
+      {# Input area #}
+      <div style="padding: 0.6rem; border-top: 1px solid #e2e8f0; background: #fff;">
+        <div style="display:flex; gap:0.4rem; align-items:flex-end;">
+          <textarea id="ai-chat-input" rows="2" placeholder="{% tr 'Type a message...' 'বার্তা লিখুন...' %}" style="
+            flex:1; border:1px solid #cbd5e1; border-radius:8px; padding:0.4rem 0.6rem;
+            font-size:0.85rem; resize:none; font-family:inherit; outline:none;
+          " onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();dlasChat.sendText();}"></textarea>
+          <div style="display:flex; flex-direction:column; gap:0.3rem;">
+            <button id="ai-send-btn" onclick="dlasChat.sendText()" title="{% tr 'Send' 'পাঠান' %}" style="
+              background:#0ea5e9; color:#fff; border:none; border-radius:6px;
+              padding:0.35rem 0.6rem; cursor:pointer; font-size:0.9rem;
+            ">➤</button>
+            <button id="ai-mic-btn" onclick="dlasChat.toggleMic()" title="{% tr 'Speak' 'বলুন' %}" style="
+              background:#6366f1; color:#fff; border:none; border-radius:6px;
+              padding:0.35rem 0.6rem; cursor:pointer; font-size:0.9rem;
+            ">🎙️</button>
+          </div>
+        </div>
+        <div id="ai-mic-status" style="font-size:0.72rem; color:#64748b; margin-top:0.25rem; display:none;">
+          {% tr "Listening..." "শুনছে..." %} <span id="ai-rec-dot" style="color:#ef4444;">●</span>
+        </div>
+        <div style="font-size:0.68rem; color:#94a3b8; margin-top:0.3rem; text-align:center;">
+          {% tr "AI-assisted · Human confirmation required" "AI সহায়তাপ্রাপ্ত · মানবীয় নিশ্চিতকরণ প্রয়োজন" %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function() {
+    'use strict';
+    var CSRF = '{{ csrf_token }}';
+    var LANG = '{{ current_language|default:"bn" }}';
+    var MSG_URL = '{% url "cases:ai_chat_message" %}';
+    var VOICE_URL = '{% url "cases:ai_voice_upload" %}';
+
+    var mediaRecorder = null;
+    var audioChunks = [];
+    var isRecording = false;
+
+    window.dlasChat = {
+      toggle: function() {
+        var panel = document.getElementById('ai-chat-panel');
+        if (panel.style.display === 'none') {
+          panel.style.display = 'block';
+          document.getElementById('ai-chat-input').focus();
+        } else {
+          panel.style.display = 'none';
+        }
+      },
+
+      addMessage: function(text, role) {
+        var box = document.getElementById('ai-chat-messages');
+        var el = document.createElement('div');
+        el.className = 'ai-msg ai-msg-' + role;
+        el.style.cssText = (
+          role === 'user'
+            ? 'background:#dbeafe;border-radius:8px;padding:0.5rem 0.75rem;font-size:0.85rem;max-width:88%;align-self:flex-end;margin-left:auto;'
+            : 'background:#e0f2fe;border-radius:8px;padding:0.5rem 0.75rem;font-size:0.85rem;max-width:90%;align-self:flex-start;'
+        );
+        el.textContent = text;
+        box.appendChild(el);
+        box.scrollTop = box.scrollHeight;
+      },
+
+      addTyping: function() {
+        var box = document.getElementById('ai-chat-messages');
+        var el = document.createElement('div');
+        el.id = 'ai-typing';
+        el.style.cssText = 'background:#e0f2fe;border-radius:8px;padding:0.5rem 0.75rem;font-size:0.85rem;max-width:90%;align-self:flex-start;color:#64748b;';
+        el.textContent = LANG === 'bn' ? 'প্রক্রিয়াকরণ চলছে...' : 'Processing...';
+        box.appendChild(el);
+        box.scrollTop = box.scrollHeight;
+        return el;
+      },
+
+      removeTyping: function() {
+        var el = document.getElementById('ai-typing');
+        if (el) el.remove();
+      },
+
+      sendText: function() {
+        var input = document.getElementById('ai-chat-input');
+        var msg = (input.value || '').trim();
+        if (!msg) return;
+        input.value = '';
+        this.addMessage(msg, 'user');
+        var typing = this.addTyping();
+        var self = this;
+
+        fetch(MSG_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': CSRF,
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify({ message: msg, lang: LANG }),
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          self.removeTyping();
+          var reply = LANG === 'bn' ? data.reply_bn : data.reply_en;
+          self.addMessage(reply, 'assistant');
+
+          // Render conversational intake action buttons if relevant
+          var box = document.getElementById('ai-chat-messages');
+          if (data.suggested_action === 'confirm_submission') {
+            var actionDiv = document.createElement('div');
+            actionDiv.style.cssText = 'display:flex;gap:0.4rem;flex-wrap:wrap;margin:0.25rem 0;';
+            actionDiv.innerHTML = '<button onclick="dlasChat.sendAction(\'confirm\')" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:0.35rem 0.65rem;font-size:0.8rem;cursor:pointer;font-weight:600;">' +
+              (LANG === 'bn' ? '✅ আবেদন নিশ্চিত ও জমা দিন' : '✅ Confirm & Submit Application') + '</button>' +
+              '<a href="/cases/apply/" style="background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:6px;padding:0.35rem 0.65rem;font-size:0.8rem;text-decoration:none;font-weight:600;">' +
+              (LANG === 'bn' ? '📝 ম্যানুয়াল ফর্ম' : '📝 Manual Form') + '</a>';
+            box.appendChild(actionDiv);
+            box.scrollTop = box.scrollHeight;
+          } else if (data.intake_active) {
+            var actionDiv = document.createElement('div');
+            actionDiv.style.cssText = 'margin:0.25rem 0;';
+            actionDiv.innerHTML = '<a href="/cases/apply/" style="font-size:0.75rem;color:#64748b;text-decoration:underline;">' +
+              (LANG === 'bn' ? 'ম্যানুয়াল ফর্মে পূরণ করতে চান? এখানে চাপুন →' : 'Switch to manual form? Click here →') + '</a>';
+            box.appendChild(actionDiv);
+            box.scrollTop = box.scrollHeight;
+          } else if (data.application_id) {
+            var actionDiv = document.createElement('div');
+            actionDiv.style.cssText = 'margin:0.25rem 0;';
+            actionDiv.innerHTML = '<a href="/cases/applications/' + data.application_id + '/" style="background:#2563eb;color:#fff;border-radius:6px;padding:0.35rem 0.65rem;font-size:0.8rem;text-decoration:none;display:inline-block;font-weight:600;">' +
+              (LANG === 'bn' ? '📄 আবেদন দেখুন (' + data.application_id + ')' : '📄 View Application (' + data.application_id + ')') + '</a>';
+            box.appendChild(actionDiv);
+            box.scrollTop = box.scrollHeight;
+          }
+
+          // Update label with real/simulated indicator
+          var labelEl = document.getElementById('ai-chat-label');
+          if (labelEl) {
+            labelEl.textContent = data.is_simulated
+              ? (LANG === 'bn' ? 'সিমুলেটেড AI সহকারী' : 'Simulated AI Assistant')
+              : (data.label_en || 'AI Assistant');
+          }
+          // Show API unavailable notice
+          if (data.api_unavailable) {
+            document.getElementById('ai-simulated-notice').style.display = 'block';
+          }
+          // Show Marma banner if detected
+          if (data.marma_workflow) {
+            document.getElementById('ai-marma-banner').style.display = 'block';
+          }
+        })
+        .catch(function(err) {
+          self.removeTyping();
+          self.addMessage(
+            LANG === 'bn'
+              ? 'সংযোগ ত্রুটি। অনুগ্রহ করে আবার চেষ্টা করুন।'
+              : 'Connection error. Please try again.',
+            'assistant'
+          );
+        });
+      },
+
+      sendAction: function(action) {
+        var self = this;
+        var typing = this.addTyping();
+        fetch(MSG_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': CSRF,
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify({ action: action, lang: LANG }),
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          self.removeTyping();
+          var reply = LANG === 'bn' ? data.reply_bn : data.reply_en;
+          self.addMessage(reply, 'assistant');
+          if (data.application_id) {
+            var box = document.getElementById('ai-chat-messages');
+            var actionDiv = document.createElement('div');
+            actionDiv.style.cssText = 'margin:0.25rem 0;';
+            actionDiv.innerHTML = '<a href="/cases/applications/' + data.application_id + '/" style="background:#2563eb;color:#fff;border-radius:6px;padding:0.35rem 0.65rem;font-size:0.8rem;text-decoration:none;display:inline-block;font-weight:600;">' +
+              (LANG === 'bn' ? '📄 আবেদন দেখুন (' + data.application_id + ')' : '📄 View Application (' + data.application_id + ')') + '</a>';
+            box.appendChild(actionDiv);
+            box.scrollTop = box.scrollHeight;
+          }
+        })
+        .catch(function() {
+          self.removeTyping();
+          self.addMessage(LANG === 'bn' ? 'সংযোগ ত্রুটি।' : 'Connection error.', 'assistant');
+        });
+      },
+
+      toggleMic: function() {
+        if (isRecording) {
+          this.stopRecording();
+        } else {
+          this.startRecording();
+        }
+      },
+
+      startRecording: function() {
+        var self = this;
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          alert(LANG === 'bn'
+            ? 'এই ব্রাউজারে মাইক্রোফোন সমর্থিত নয়।'
+            : 'Microphone not supported in this browser.');
+          return;
+        }
+        navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(function(stream) {
+          audioChunks = [];
+          mediaRecorder = new MediaRecorder(stream);
+          mediaRecorder.ondataavailable = function(e) {
+            if (e.data.size > 0) audioChunks.push(e.data);
+          };
+          mediaRecorder.onstop = function() {
+            var blob = new Blob(audioChunks, { type: 'audio/webm' });
+            self.transcribeAudio(blob);
+            stream.getTracks().forEach(function(t) { t.stop(); });
+          };
+          mediaRecorder.start();
+          isRecording = true;
+          document.getElementById('ai-mic-status').style.display = 'block';
+          document.getElementById('ai-mic-btn').style.background = '#ef4444';
+          document.getElementById('ai-mic-btn').title = LANG === 'bn' ? 'বন্ধ করুন' : 'Stop';
+        })
+        .catch(function() {
+          alert(LANG === 'bn'
+            ? 'মাইক্রোফোন অ্যাক্সেস অস্বীকৃত।'
+            : 'Microphone access denied.');
+        });
+      },
+
+      stopRecording: function() {
+        if (mediaRecorder && isRecording) {
+          mediaRecorder.stop();
+          isRecording = false;
+          document.getElementById('ai-mic-status').style.display = 'none';
+          document.getElementById('ai-mic-btn').style.background = '#6366f1';
+          document.getElementById('ai-mic-btn').title = LANG === 'bn' ? 'বলুন' : 'Speak';
+        }
+      },
+
+      transcribeAudio: function(blob) {
+        var self = this;
+        var typing = this.addTyping();
+        var formData = new FormData();
+        formData.append('audio', blob, 'recording.webm');
+
+        fetch(VOICE_URL, {
+          method: 'POST',
+          headers: { 'X-CSRFToken': CSRF },
+          body: formData,
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          self.removeTyping();
+          var transcript = data.transcript || '';
+          if (transcript) {
+            // Put transcript in input for user to review before sending
+            document.getElementById('ai-chat-input').value = transcript;
+            document.getElementById('ai-chat-input').focus();
+            if (data.api_unavailable) {
+              document.getElementById('ai-simulated-notice').style.display = 'block';
+            }
+          } else {
+            self.addMessage(
+              LANG === 'bn' ? 'অডিও বোঝা যায়নি। আবার চেষ্টা করুন।' : 'Could not understand audio. Please try again.',
+              'assistant'
+            );
+          }
+        })
+        .catch(function() {
+          self.removeTyping();
+          self.addMessage(
+            LANG === 'bn' ? 'ভয়েস আপলোডে ত্রুটি।' : 'Voice upload error.',
+            'assistant'
+          );
+        });
+      },
+    };
+  })();
+  </script>
+  {% endif %}
+
 </body>
 </html>

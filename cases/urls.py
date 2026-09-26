@@ -31,4 +31,8 @@ urlpatterns = [
     path('offline-queue/', views.offline_queue_view, name='offline_queue'),
     path('offline/sync/', views.offline_sync_api, name='offline_sync'),
     path('offline/resolve-conflict/', views.offline_conflict_resolve_api, name='offline_conflict_resolve'),
+
+    # Universal AI Voice Chat
+    path('ai-chat/message/', views.universal_ai_chat_message, name='ai_chat_message'),
+    path('ai-chat/voice/', views.universal_ai_voice_upload, name='ai_voice_upload'),
 ]

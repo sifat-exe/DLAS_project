@@ -1309,4 +1309,132 @@ def offline_conflict_resolve_api(request):
         return JsonResponse({'status': 'failed', 'error': str(e)}, status=400)
 
 
+# =============================================================================
+# UNIVERSAL AI VOICE CHAT — Text & Voice Endpoints
+# =============================================================================
 
+@login_required
+def universal_ai_chat_message(request):
+    """
+    Universal AI Voice Chat — text message endpoint.
+    POST: JSON body {"message": "...", "lang": "bn", "action": "..."}
+    Returns JSON with bilingual AI reply and intake status.
+    Security: login_required + CSRF enforced. API key server-side only.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    try:
+        body = json.loads(request.body.decode('utf-8'))
+    except Exception:
+        body = {}
+
+    message = (body.get('message') or request.POST.get('message', '')).strip()
+    lang = (body.get('lang') or request.POST.get('lang', 'bn')).strip()
+    action = (body.get('action') or request.POST.get('action', '')).strip()
+
+    # Convert client UI actions into natural commands if provided
+    if action == 'confirm':
+        message = 'CONFIRM'
+    elif action == 'cancel':
+        message = 'cancel'
+    elif action == 'manual_form':
+        message = 'manual form'
+
+    # Server-side history and intake state
+    history = request.session.get('ai_chat_history', [])
+    intake_state = request.session.get('ai_intake_state')
+
+    from cases.universal_ai_service import get_ai_chat_service, MockUniversalChatService
+    service = get_ai_chat_service()
+
+    try:
+        result = service.chat(
+            message=message,
+            history=history,
+            lang=lang,
+            intake_state=intake_state,
+            user=request.user,
+        )
+    except Exception as e:
+        result = MockUniversalChatService.chat(
+            message=message,
+            history=history,
+            lang=lang,
+            intake_state=intake_state,
+            user=request.user,
+        )
+        result['fallback_reason'] = str(e)
+        result['api_unavailable'] = True
+
+    # Persist or clear intake state in session
+    if result.get('intake_active'):
+        request.session['ai_intake_state'] = result.get('intake_state', intake_state)
+    else:
+        request.session['ai_intake_state'] = None
+
+    # Persist conversation server-side (cap at 20 turns)
+    history.append({'role': 'user', 'text_en': message, 'text_bn': message})
+    history.append({'role': 'assistant', 'text_en': result['reply_en'], 'text_bn': result['reply_bn']})
+    if len(history) > 20:
+        history = history[-20:]
+    request.session['ai_chat_history'] = history
+    request.session.modified = True
+
+    return JsonResponse({
+        'reply_en': result['reply_en'],
+        'reply_bn': result['reply_bn'],
+        'is_simulated': result.get('is_simulated', True),
+        'marma_workflow': result.get('marma_workflow', False),
+        'voice_task_intent': result.get('voice_task_intent'),
+        'suggested_action': result.get('suggested_action'),
+        'intake_active': result.get('intake_active', False),
+        'intake_status': result.get('intake_status'),
+        'application_id': result.get('application_id'),
+        'manual_form_url': result.get('manual_form_url'),
+        'current_slot': result.get('current_slot'),
+        'disclaimer_en': result.get('disclaimer_en', ''),
+        'disclaimer_bn': result.get('disclaimer_bn', ''),
+        'label_en': result.get('label_en', ''),
+        'label_bn': result.get('label_bn', ''),
+        'api_unavailable': result.get('api_unavailable', False),
+    })
+
+
+@login_required
+def universal_ai_voice_upload(request):
+    """
+    Universal AI Voice Chat — audio transcription endpoint.
+    POST multipart with audio file in request.FILES['audio'].
+    Returns JSON {transcript, is_simulated, language}.
+    Security: login_required + CSRF. API key server-side only.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    audio_file = request.FILES.get('audio')
+    if not audio_file:
+        return JsonResponse({'error': 'No audio file provided.'}, status=400)
+
+    if audio_file.size > 10 * 1024 * 1024:
+        return JsonResponse({'error': 'Audio file too large (max 10 MB).'}, status=413)
+
+    audio_bytes = audio_file.read()
+    filename = audio_file.name or 'audio.webm'
+
+    from cases.universal_ai_service import get_ai_chat_service, MockUniversalChatService
+    service = get_ai_chat_service()
+
+    try:
+        result = service.transcribe_audio(audio_bytes=audio_bytes, filename=filename)
+    except Exception as e:
+        result = MockUniversalChatService.transcribe_audio(audio_bytes=audio_bytes, filename=filename)
+        result['fallback_reason'] = str(e)
+        result['api_unavailable'] = True
+
+    return JsonResponse({
+        'transcript': result.get('transcript', ''),
+        'is_simulated': result.get('is_simulated', True),
+        'language': result.get('language', 'bn'),
+        'api_unavailable': result.get('api_unavailable', False),
+    })
