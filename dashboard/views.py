@@ -29,7 +29,7 @@ def citizen_dashboard(request):
     voice_chat_pending = False
     if request.user.is_authenticated:
         applications = Application.objects.filter(applicant_user=request.user).order_by('-created_at')
-        intake_state = request.session.get('conversational_intake')
+        intake_state = request.session.get('conversational_intake') or request.session.get('ai_intake_state')
         if intake_state and intake_state.get('status') == 'review':
             voice_chat_pending = True
     

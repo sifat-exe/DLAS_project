@@ -977,3 +977,373 @@ class ConversationalApplicationWorkflowTest(TestCase):
             ConversationalIntakeManager.submit_intake_application(bad_state, user=self.citizen)
 
 
+class GeminiConversationalApplicationIntakeFlowTests(TestCase):
+    """
+    Dedicated test suite for Gemini Conversational Application Intake Flow.
+    Validates Requirements A through O:
+    A. Gemini collects required fields
+    B. Missing field prevents submission
+    C. Invalid field prevents submission
+    D. Review state appears before submission
+    E. Confirmation submits application
+    F. Successful submission creates the normal application record
+    G. Application ID is generated
+    H. Application appears in existing application records/dashboard
+    I. Case ID is NOT generated before officer acceptance
+    J. CaseEvent/audit entry is created
+    K. Gemini intake is marked with the correct provenance/channel
+    L. Duplicate confirmation does not create duplicate applications
+    M. Submission failure does not falsely show success
+    N. Bangla flow works
+    O. Existing manual /cases/apply/ flow still works
+    """
+
+    def setUp(self):
+        self.citizen = make_citizen(username='gemini_citizen', password='password123')
+        self.officer = make_officer(username='gemini_officer', password='password123')
+        self.client.login(username='gemini_citizen', password='password123')
+        self.settings_override = self.settings(OPENAI_API_KEY='', GEMINI_API_KEY='')
+        self.settings_override.enable()
+
+    def tearDown(self):
+        self.settings_override.disable()
+
+    def _complete_intake_up_to_review(self, lang='en'):
+        """Helper to step through intake slots until reaching the review state."""
+        start_msg = 'I want to apply for legal aid' if lang == 'en' else 'আমি আইনি সহায়তা চাই'
+        r1 = self.client.post(
+            reverse('cases:ai_chat_message'),
+            data=json.dumps({'message': start_msg, 'lang': lang}),
+            content_type='application/json',
+        )
+        self.assertEqual(r1.status_code, 200)
+
+        name_val = 'Fatima Khatun' if lang == 'en' else 'ফাতেমা খাতুন'
+        r2 = self.client.post(
+            reverse('cases:ai_chat_message'),
+            data=json.dumps({'message': name_val, 'lang': lang}),
+            content_type='application/json',
+        )
+        self.assertEqual(r2.status_code, 200)
+
+        phone_val = '01711998877'
+        r3 = self.client.post(
+            reverse('cases:ai_chat_message'),
+            data=json.dumps({'message': phone_val, 'lang': lang}),
+            content_type='application/json',
+        )
+        self.assertEqual(r3.status_code, 200)
+
+        addr_val = 'Village Rampur, Upazila Sadar, Sylhet' if lang == 'en' else 'গ্রাম: রামপুর, উপজেলা: সদর, জেলা: সিলেট'
+        r4 = self.client.post(
+            reverse('cases:ai_chat_message'),
+            data=json.dumps({'message': addr_val, 'lang': lang}),
+            content_type='application/json',
+        )
+        self.assertEqual(r4.status_code, 200)
+
+        prob_val = 'Family land dispute and boundary conflict' if lang == 'en' else 'পৈতৃক জমিজমা ও সীমানা বিরোধ'
+        r5 = self.client.post(
+            reverse('cases:ai_chat_message'),
+            data=json.dumps({'message': prob_val, 'lang': lang}),
+            content_type='application/json',
+        )
+        self.assertEqual(r5.status_code, 200)
+
+        desc_val = 'Opposing party demolished the boundary fence without notice.' if lang == 'en' else 'প্রতিপক্ষ কোনো নোটিশ ছাড়াই সীমানা প্রাচীর ভেঙে জোরপূর্বক দখল নিয়েছে।'
+        r6 = self.client.post(
+            reverse('cases:ai_chat_message'),
+            data=json.dumps({'message': desc_val, 'lang': lang}),
+            content_type='application/json',
+        )
+        self.assertEqual(r6.status_code, 200)
+        return r6
+
+    def test_requirement_a_gemini_collects_required_fields(self):
+        """A. Gemini collects the required fields (name, phone, address, legal_problem, incident_description)."""
+        r_rev = self._complete_intake_up_to_review(lang='en')
+        d_rev = r_rev.json()
+        self.assertEqual(d_rev.get('intake_status'), 'review')
+        # All 5 fields are reflected in the review summary text
+        reply = d_rev.get('reply_en', '')
+        self.assertIn('Fatima Khatun', reply)
+        self.assertIn('01711998877', reply)
+        self.assertIn('Rampur', reply)
+        self.assertIn('Family land dispute', reply)
+        self.assertIn('boundary fence', reply)
+
+    def test_requirement_b_missing_field_prevents_submission(self):
+        """B. Missing required fields prevent submission even if user sends CONFIRM."""
+        # Start and provide only name
+        self.client.post(
+            reverse('cases:ai_chat_message'),
+            data=json.dumps({'message': 'I want to apply', 'lang': 'en'}),
+            content_type='application/json',
+        )
+        self.client.post(
+            reverse('cases:ai_chat_message'),
+            data=json.dumps({'message': 'Fatima Khatun', 'lang': 'en'}),
+            content_type='application/json',
+        )
+        # Attempt premature confirmation
+        res = self.client.post(
+            reverse('cases:ai_chat_message'),
+            data=json.dumps({'message': 'CONFIRM', 'lang': 'en'}),
+            content_type='application/json',
+        )
+        data = res.json()
+        self.assertNotEqual(data.get('intake_status'), 'confirmed')
+        self.assertEqual(Application.objects.count(), 0)
+
+    def test_requirement_c_invalid_field_prevents_submission(self):
+        """C. Invalid fields (too short name, phone < 6 digits, short problem/desc) are rejected."""
+        self.client.post(reverse('cases:ai_chat_message'), data=json.dumps({'message': 'I want to apply'}), content_type='application/json')
+        # Name too short
+        r_name = self.client.post(reverse('cases:ai_chat_message'), data=json.dumps({'message': 'F'}), content_type='application/json')
+        self.assertIn('at least 2 characters', r_name.json().get('reply_en') + r_name.json().get('reply_bn'))
+
+        # Valid name
+        self.client.post(reverse('cases:ai_chat_message'), data=json.dumps({'message': 'Fatima Khatun'}), content_type='application/json')
+        # Phone too short
+        r_phone = self.client.post(reverse('cases:ai_chat_message'), data=json.dumps({'message': '123'}), content_type='application/json')
+        self.assertIn('at least 6 digits', r_phone.json().get('reply_en') + r_phone.json().get('reply_bn'))
+        self.assertEqual(Application.objects.count(), 0)
+
+    def test_requirement_d_review_state_appears_before_submission(self):
+        """D. When all required fields are collected, review state appears before submission with exact strings."""
+        r_rev = self._complete_intake_up_to_review(lang='en')
+        d_rev = r_rev.json()
+        self.assertEqual(d_rev.get('intake_status'), 'review')
+        self.assertEqual(d_rev.get('suggested_action'), 'confirm_submission')
+        # Exact required bilingual strings
+        self.assertIn("Your application is complete. Please confirm submission.", d_rev.get('reply_en'))
+        self.assertIn("আপনার আবেদন সম্পূর্ণ হয়েছে। অনুগ্রহ করে জমা দেওয়ার বিষয়টি নিশ্চিত করুন।", d_rev.get('reply_bn'))
+        # No application in DB yet
+        self.assertEqual(Application.objects.count(), 0)
+
+    def test_requirement_e_and_f_and_g_confirmation_creates_normal_application_with_id(self):
+        """E, F, G. Confirmation creates normal application record with generated Application ID."""
+        self._complete_intake_up_to_review(lang='en')
+
+        # Send confirmation
+        res = self.client.post(
+            reverse('cases:ai_chat_message'),
+            data=json.dumps({'message': 'CONFIRM', 'lang': 'en'}),
+            content_type='application/json',
+        )
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data.get('intake_status'), 'confirmed')
+        self.assertFalse(data.get('intake_active'))
+
+        app_id = data.get('application_id')
+        self.assertIsNotNone(app_id)
+        self.assertTrue(app_id.startswith('APP-'))
+
+        # Exact required success messages
+        self.assertIn("Application submitted successfully.", data.get('reply_en'))
+        self.assertIn(f"Application ID: {app_id}", data.get('reply_en'))
+        self.assertIn("Your application has been received and is now awaiting officer review.", data.get('reply_en'))
+
+        self.assertIn("আবেদন সফলভাবে জমা হয়েছে।", data.get('reply_bn'))
+        self.assertIn(f"আবেদন আইডি: {app_id}", data.get('reply_bn'))
+        self.assertIn("আপনার আবেদন গ্রহণ করা হয়েছে এবং এখন কর্মকর্তার পর্যালোচনার অপেক্ষায় রয়েছে।", data.get('reply_bn'))
+
+        # Verify DB record (F)
+        app = Application.objects.get(application_id=app_id)
+        self.assertEqual(app.name, 'Fatima Khatun')
+        self.assertEqual(app.phone, '01711998877')
+        self.assertEqual(app.status, Application.STATUS_SUBMITTED)
+        self.assertEqual(app.applicant_user, self.citizen)
+
+    def test_requirement_h_application_appears_in_existing_records_dashboard(self):
+        """H. Submitted application appears in citizen dashboard and officer dashboard."""
+        self._complete_intake_up_to_review(lang='en')
+        r_conf = self.client.post(
+            reverse('cases:ai_chat_message'),
+            data=json.dumps({'message': 'CONFIRM', 'lang': 'en'}),
+            content_type='application/json',
+        )
+        app_id = r_conf.json().get('application_id')
+
+        # 1. Citizen dashboard
+        r_dash = self.client.get(reverse('dashboard:citizen'))
+        self.assertEqual(r_dash.status_code, 200)
+        self.assertIn(app_id, r_dash.content.decode('utf-8'))
+        self.assertIn('Fatima Khatun', r_dash.content.decode('utf-8'))
+
+        # 2. Officer dashboard
+        self.client.login(username='gemini_officer', password='password123')
+        r_off = self.client.get(reverse('dashboard:officer'))
+        self.assertEqual(r_off.status_code, 200)
+        self.assertIn(app_id, r_off.content.decode('utf-8'))
+
+        # 3. Application detail tracking page
+        self.client.login(username='gemini_citizen', password='password123')
+        r_det = self.client.get(reverse('cases:application_detail', args=[app_id]))
+        self.assertEqual(r_det.status_code, 200)
+        self.assertIn(app_id, r_det.content.decode('utf-8'))
+
+    def test_requirement_i_case_id_not_generated_before_officer_acceptance(self):
+        """I. Case ID is NOT generated before officer acceptance."""
+        self._complete_intake_up_to_review(lang='en')
+        r_conf = self.client.post(
+            reverse('cases:ai_chat_message'),
+            data=json.dumps({'message': 'CONFIRM'}),
+            content_type='application/json',
+        )
+        app_id = r_conf.json().get('application_id')
+        app = Application.objects.get(application_id=app_id)
+
+        # Strictly no CaseRecord exists
+        self.assertFalse(CaseRecord.objects.filter(application=app).exists())
+        self.assertIsNone(getattr(app, 'case_record', None))
+
+    def test_requirement_j_and_k_case_event_created_with_provenance_and_channel(self):
+        """J, K. CaseEvent audit entry is created with applicant_confirmed provenance and channel."""
+        self._complete_intake_up_to_review(lang='en')
+        r_conf = self.client.post(
+            reverse('cases:ai_chat_message'),
+            data=json.dumps({'message': 'CONFIRM'}),
+            content_type='application/json',
+        )
+        app_id = r_conf.json().get('application_id')
+        app = Application.objects.get(application_id=app_id)
+
+        # Audit event from submit_application
+        event_submit = CaseEvent.objects.filter(application=app, action='APPLICATION_SUBMITTED').first()
+        self.assertIsNotNone(event_submit)
+        self.assertEqual(event_submit.provenance, CaseEvent.PROVENANCE_APPLICANT_CONFIRMED)
+        self.assertEqual(event_submit.channel, 'web')
+
+        # Conversational intake confirmed event
+        event_conv = CaseEvent.objects.filter(application=app, action='conversational_intake_confirmed').first()
+        self.assertIsNotNone(event_conv)
+        self.assertEqual(event_conv.provenance, CaseEvent.PROVENANCE_APPLICANT_CONFIRMED)
+        self.assertIn('Conversational AI', event_conv.description)
+
+    def test_requirement_l_duplicate_confirmation_does_not_create_duplicate_applications(self):
+        """L. Duplicate confirmation message does not create a second application."""
+        self._complete_intake_up_to_review(lang='en')
+        r1 = self.client.post(
+            reverse('cases:ai_chat_message'),
+            data=json.dumps({'message': 'CONFIRM'}),
+            content_type='application/json',
+        )
+        app_id = r1.json().get('application_id')
+        self.assertEqual(Application.objects.count(), 1)
+
+        # Send second confirmation
+        r2 = self.client.post(
+            reverse('cases:ai_chat_message'),
+            data=json.dumps({'message': 'CONFIRM'}),
+            content_type='application/json',
+        )
+        d2 = r2.json()
+        self.assertEqual(Application.objects.count(), 1)  # No duplicate!
+        self.assertEqual(d2.get('application_id'), app_id)
+        self.assertIn("already been submitted", d2.get('reply_en') + d2.get('reply_bn'))
+
+    def test_requirement_l_immediate_inquiry_returns_stored_application_id(self):
+        """L. If user asks about application immediately afterward, returns stored Application ID and status."""
+        self._complete_intake_up_to_review(lang='en')
+        r1 = self.client.post(
+            reverse('cases:ai_chat_message'),
+            data=json.dumps({'message': 'CONFIRM'}),
+            content_type='application/json',
+        )
+        app_id = r1.json().get('application_id')
+
+        # Immediately ask status
+        r_inq = self.client.post(
+            reverse('cases:ai_chat_message'),
+            data=json.dumps({'message': 'What is the status of my application?'}),
+            content_type='application/json',
+        )
+        d_inq = r_inq.json()
+        self.assertEqual(d_inq.get('application_id'), app_id)
+        self.assertIn(app_id, d_inq.get('reply_en') + d_inq.get('reply_bn'))
+        # Does not restart intake
+        self.assertFalse(d_inq.get('intake_active'))
+
+    def test_requirement_m_submission_failure_does_not_falsely_show_success(self):
+        """M. Backend submission failure does not claim success, preserves review state, and allows retry."""
+        self._complete_intake_up_to_review(lang='en')
+
+        # Patch submit_application to simulate a database failure
+        with patch('cases.universal_ai_service.submit_application', side_effect=RuntimeError("Simulated DB connection failure")):
+            res = self.client.post(
+                reverse('cases:ai_chat_message'),
+                data=json.dumps({'message': 'CONFIRM'}),
+                content_type='application/json',
+            )
+            data = res.json()
+            # Does NOT claim success
+            self.assertNotEqual(data.get('intake_status'), 'confirmed')
+            self.assertIsNone(data.get('application_id'))
+            self.assertTrue(data.get('intake_active'))
+            self.assertEqual(data.get('intake_status'), 'review')
+            # Shows error message
+            self.assertIn("ত্রুটি", data.get('reply_bn'))
+            self.assertEqual(Application.objects.count(), 0)
+
+        # After the failure is resolved, user retries confirmation
+        r_retry = self.client.post(
+            reverse('cases:ai_chat_message'),
+            data=json.dumps({'message': 'CONFIRM'}),
+            content_type='application/json',
+        )
+        d_retry = r_retry.json()
+        self.assertEqual(d_retry.get('intake_status'), 'confirmed')
+        self.assertEqual(Application.objects.count(), 1)
+
+    def test_requirement_n_bangla_flow_works(self):
+        """N. Complete intake flow works entirely in Bangla with proper Bangla strings."""
+        self._complete_intake_up_to_review(lang='bn')
+
+        # Explicit confirmation in Bangla
+        res = self.client.post(
+            reverse('cases:ai_chat_message'),
+            data=json.dumps({'message': 'হ্যাঁ, আবেদন জমা দিন', 'lang': 'bn'}),
+            content_type='application/json',
+        )
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data.get('intake_status'), 'confirmed')
+
+        app_id = data.get('application_id')
+        self.assertTrue(app_id.startswith('APP-'))
+
+        # Proper Bangla success response
+        self.assertIn("আবেদন সফলভাবে জমা হয়েছে।", data.get('reply_bn'))
+        self.assertIn(f"আবেদন আইডি: {app_id}", data.get('reply_bn'))
+        self.assertIn("আপনার আবেদন গ্রহণ করা হয়েছে এবং এখন কর্মকর্তার পর্যালোচনার অপেক্ষায় রয়েছে।", data.get('reply_bn'))
+
+        app = Application.objects.get(application_id=app_id)
+        self.assertEqual(app.name, 'ফাতেমা খাতুন')
+        self.assertEqual(app.phone, '01711998877')
+
+    def test_requirement_o_existing_manual_cases_apply_flow_still_works(self):
+        """O. Existing manual /cases/apply/ flow continues to work without modification."""
+        get_res = self.client.get(reverse('cases:application_create'))
+        self.assertEqual(get_res.status_code, 200)
+
+        post_data = {
+            'action': 'submit',
+            'name': 'Manual Flow Citizen',
+            'phone': '01988776655',
+            'address': 'Dhanmondi, Dhaka',
+            'legal_problem': 'Commercial lease dispute',
+            'incident_description': 'Landlord unlawfully locked office premises.',
+            'preferred_channel': 'web',
+            'language': 'bn',
+        }
+        post_res = self.client.post(reverse('cases:application_create'), data=post_data)
+        self.assertEqual(post_res.status_code, 302)
+        app = Application.objects.filter(name='Manual Flow Citizen').first()
+        self.assertIsNotNone(app)
+        self.assertEqual(app.phone, '01988776655')
+        self.assertTrue(app.application_id.startswith('APP-'))
+
+
+

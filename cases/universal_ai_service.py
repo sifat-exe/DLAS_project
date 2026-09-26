@@ -17,11 +17,15 @@ SAFETY RULES (per MASTER_PRD Section 4.4):
 
 import io
 import re
+import logging
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from cases.forms import CitizenApplicationForm
 from cases.services import submit_application
 from cases.models import Application, CaseEvent
+
+logger = logging.getLogger(__name__)
+
 
 
 # ---------------------------------------------------------------------------
@@ -146,8 +150,20 @@ class ConversationalIntakeManager:
         patterns = [
             'apply', 'application', 'file application', 'start application',
             'legal aid application', 'help me apply', 'intake',
+            'file a case', 'need legal aid', 'legal help', 'legal assistance',
             'আবেদন', 'আবেদন করতে চাই', 'আইনি সহায়তা চাই', 'আইনি সহায়তা চাই',
             'আবেদন শুরু', 'দরখাস্ত', 'আবেদন করব', 'সহায়তা চাই', 'সহায়তা চাই',
+            'আইনি সহায়তা', 'সাহায্য চাই', 'আইনি পরামর্শ', 'মামলা করতে চাই', 'নতুন আবেদন',
+        ]
+        return any(p in t for p in patterns)
+
+    @classmethod
+    def detect_start_new_intent(cls, text):
+        t = (text or '').lower().strip()
+        patterns = [
+            'new application', 'start new application', 'apply again',
+            'start over', 'another application',
+            'নতুন আবেদন', 'আবার আবেদন', 'নতুন করে আবেদন', 'নতুন আবেদন শুরু',
         ]
         return any(p in t for p in patterns)
 
@@ -169,11 +185,21 @@ class ConversationalIntakeManager:
     @classmethod
     def detect_confirm_intent(cls, text):
         t = (text or '').lower().strip()
+        clean = re.sub(r'[,.!?।#*~_\-]', ' ', t)
+        clean = re.sub(r'\s+', ' ', clean).strip()
         patterns = [
             'confirm', 'yes', 'submit', 'i confirm', 'submit application',
-            'হ্যাঁ', 'হ্যা', 'নিশ্চিত', 'নিশ্চিত করুন', 'জমা দিন', 'আবেদন জমা দিন',
+            'confirm submission', 'please submit', 'yes submit', 'i agree',
+            'complete submission', 'submit now', 'yes please',
+            'হ্যাঁ', 'হ্যা', 'হাঁ', 'নিশ্চিত', 'নিশ্চিত করুন', 'জমা দিন',
+            'আবেদন জমা দিন', 'জমা', 'ঠিক আছে', 'দাখিল করুন', 'সম্মতি দিচ্ছি',
+            'জমা দিতে চাই', 'আবেদন জমা', 'জমা করুন'
         ]
-        return any(p == t or t.startswith(p + ' ') or t.endswith(' ' + p) for p in patterns)
+        return (
+            any(p == clean for p in patterns) or
+            any(clean.startswith(p + ' ') or clean.endswith(' ' + p) or f' {p} ' in f' {clean} ' for p in patterns)
+        )
+
 
     @classmethod
     def init_state(cls, lang='bn'):
@@ -353,7 +379,8 @@ class ConversationalIntakeManager:
         nid = slots.get('nid_number') or ("প্রযোজ্য নয়" if lang == 'bn' else "N/A")
 
         summary_bn = (
-            "📋 আপনার আবেদন তথ্যের সারসংক্ষেপ:\n\n"
+            "আপনার আবেদন সম্পূর্ণ হয়েছে। অনুগ্রহ করে জমা দেওয়ার বিষয়টি নিশ্চিত করুন।\n\n"
+            "📋 আবেদন তথ্যের সারসংক্ষেপ:\n"
             f"• পূর্ণ নাম: {name}\n"
             f"• যোগাযোগ ফোন: {phone}\n"
             f"• বর্তমান ঠিকানা: {address}\n"
@@ -361,13 +388,12 @@ class ConversationalIntakeManager:
             f"• ঘটনার বিবরণ: {incident}\n"
             f"• নিরাপদ বিকল্প যোগাযোগ: {safe_contact} ({safe_time})\n"
             f"• জাতীয় পরিচয়পত্র (ঐচ্ছিক): {nid}\n\n"
-            "⚠️ আপনি কি এই তথ্য দিয়ে আবেদন জমা দিতে চান?\n"
-            "জমা দিতে 'নিশ্চিত' বা 'হ্যাঁ' বলুন অথবা নিচের 'আবেদন জমা দিন' বাটনে চাপুন।\n"
-            "কোনো তথ্য সংশোধন করতে চাইলে তা লিখুন, অথবা সরাসরি ম্যানুয়াল ফর্মে যেতে চাইলে 'ম্যানুয়াল ফর্ম' বলুন।"
+            "আবেদনটি জমা দিতে 'নিশ্চিত' বা 'হ্যাঁ' বলুন অথবা নিচের বাটনে চাপুন। তথ্য সংশোধন করতে চাইলে তা লিখুন।"
         )
 
         summary_en = (
-            "📋 Application Information Summary:\n\n"
+            "Your application is complete. Please confirm submission.\n\n"
+            "📋 Application Information Summary:\n"
             f"• Full Legal Name: {name}\n"
             f"• Contact Phone: {phone}\n"
             f"• Current Address: {address}\n"
@@ -375,9 +401,7 @@ class ConversationalIntakeManager:
             f"• Incident Description: {incident}\n"
             f"• Safe Contact Phone: {safe_contact} ({safe_time})\n"
             f"• NID Number (Optional): {nid}\n\n"
-            "⚠️ Would you like to submit your application with this information?\n"
-            "To submit, reply 'CONFIRM' or 'YES' or click the 'Submit Application' button below.\n"
-            "To edit, state the correction, or say 'manual form' to fill out the form manually."
+            "To submit, reply 'CONFIRM' or 'YES' or click the confirmation button below. To edit, state your correction."
         )
 
         return summary_en, summary_bn
@@ -433,7 +457,7 @@ class ConversationalIntakeManager:
             channel=channel or 'web',
             action='conversational_intake_confirmed',
             description=(
-                f"Applicant reviewed and confirmed intake details via Conversational AI. "
+                f"Applicant reviewed and confirmed intake details via Conversational AI (Gemini). "
                 f"Generated Application ID: {app.application_id}."
             ),
             provenance=CaseEvent.PROVENANCE_APPLICANT_CONFIRMED,
@@ -442,12 +466,77 @@ class ConversationalIntakeManager:
 
         state['status'] = 'confirmed'
         state['application_id'] = app.application_id
+        state['active'] = False
         return app
 
     @classmethod
     def process_turn(cls, message, state, user=None, lang='bn'):
         msg = (message or '').strip()
         current_status = state.get('status', 'in_progress')
+
+        # 0. Check if application has already been submitted (Requirement 7)
+        if current_status in ('confirmed', 'submitted'):
+            app_id = state.get('application_id') or "N/A"
+
+            # Allow user to start fresh application if explicitly requested
+            if cls.detect_start_new_intent(msg):
+                state.clear()
+                state.update(cls.init_state(lang=lang))
+                missing = cls.get_next_missing_slot(state['slots'])
+                prompt = cls.SLOT_PROMPTS[missing]
+                return {
+                    'reply_bn': prompt['bn'],
+                    'reply_en': prompt['en'],
+                    'intake_active': True,
+                    'intake_status': 'in_progress',
+                    'current_slot': missing,
+                    'suggested_action': None,
+                }
+
+            # Guard against accidental duplicate submission
+            if cls.detect_confirm_intent(msg):
+                dup_bn = (
+                    f"এই আবেদনটি ইতিমধ্যে জমা দেওয়া হয়েছে।\n"
+                    f"আবেদন আইডি: {app_id}\n"
+                    f"আপনার আবেদনটি গ্রহণ করা হয়েছে এবং কর্মকর্তার পর্যালোচনার অপেক্ষায় রয়েছে।"
+                )
+                dup_en = (
+                    f"This application has already been submitted.\n"
+                    f"Application ID: {app_id}\n"
+                    f"Your application has been received and is awaiting officer review."
+                )
+                return {
+                    'reply_bn': dup_bn,
+                    'reply_en': dup_en,
+                    'intake_active': False,
+                    'intake_status': 'confirmed',
+                    'application_id': app_id,
+                    'application_url': f'/cases/applications/{app_id}/' if app_id != "N/A" else None,
+                    'suggested_action': 'view_application',
+                }
+
+            # If the user asks about the application immediately afterward, return stored ID/status
+            inq_bn = (
+                f"আপনার আবেদনটি ইতিমধ্যে সফলভাবে জমা হয়েছে।\n"
+                f"আবেদন আইডি: {app_id}\n"
+                f"অবস্থা: কর্মকর্তার পর্যালোচনার অপেক্ষায় (জমা দেওয়া হয়েছে)।\n"
+                f"আপনার আবেদন গ্রহণ করা হয়েছে এবং এখন কর্মকর্তার পর্যালোচনার অপেক্ষায় রয়েছে।"
+            )
+            inq_en = (
+                f"Your application has already been submitted successfully.\n"
+                f"Application ID: {app_id}\n"
+                f"Status: Awaiting Officer Review (Submitted).\n"
+                f"Your application has been received and is now awaiting officer review."
+            )
+            return {
+                'reply_bn': inq_bn,
+                'reply_en': inq_en,
+                'intake_active': False,
+                'intake_status': 'confirmed',
+                'application_id': app_id,
+                'application_url': f'/cases/applications/{app_id}/' if app_id != "N/A" else None,
+                'suggested_action': 'view_application',
+            }
 
         # 1. Cancellation check
         if cls.detect_cancel_intent(msg):
@@ -485,16 +574,14 @@ class ConversationalIntakeManager:
                     app = cls.submit_intake_application(state, user=user, lang=lang)
                     state['active'] = False
                     reply_bn = (
-                        f"🎉 আপনার আবেদনটি সফলভাবে জমা দেওয়া হয়েছে!\n\n"
-                        f"• আবেদন নম্বর: {app.application_id}\n"
-                        f"• স্থিতি: জমা দেওয়া হয়েছে (Submitted)\n\n"
-                        f"জেলা আইনি সহায়তা কর্মকর্তা (DLAO) এটি পর্যালোচনা করবেন। আপনি ড্যাশবোর্ড থেকে আবেদনের অগ্রগতি পর্যবেক্ষণ করতে পারবেন।"
+                        f"আবেদন সফলভাবে জমা হয়েছে।\n"
+                        f"আবেদন আইডি: {app.application_id}\n"
+                        f"আপনার আবেদন গ্রহণ করা হয়েছে এবং এখন কর্মকর্তার পর্যালোচনার অপেক্ষায় রয়েছে।"
                     )
                     reply_en = (
-                        f"🎉 Your application has been successfully submitted!\n\n"
-                        f"• Application ID: {app.application_id}\n"
-                        f"• Status: Submitted\n\n"
-                        f"A District Legal Aid Officer (DLAO) will review your application. You can track its progress on your dashboard."
+                        f"Application submitted successfully.\n"
+                        f"Application ID: {app.application_id}\n"
+                        f"Your application has been received and is now awaiting officer review."
                     )
                     return {
                         'reply_bn': reply_bn,
@@ -502,18 +589,37 @@ class ConversationalIntakeManager:
                         'intake_active': False,
                         'intake_status': 'confirmed',
                         'application_id': app.application_id,
+                        'application_url': f'/cases/applications/{app.application_id}/',
                         'suggested_action': 'view_application',
                     }
                 except ValidationError as ve:
+                    logger.error("Conversational intake submission validation error: %s", ve, exc_info=True)
                     err_msg = str(ve)
-                    reply_bn = f"আবেদন তথ্যে ত্রুটি রয়েছে: {err_msg}। অনুগ্রহ করে সংশোধন করুন।"
-                    reply_en = f"There is an error with the application details: {err_msg}. Please correct it."
+                    state['status'] = 'review'
+                    state['active'] = True
+                    reply_bn = f"আবেদন তথ্যে ত্রুটি রয়েছে: {err_msg}। অনুগ্রহ করে সংশোধন করে আবার নিশ্চিত করুন।"
+                    reply_en = f"There is an error with the application details: {err_msg}. Please correct it and confirm again."
                     return {
                         'reply_bn': reply_bn,
                         'reply_en': reply_en,
                         'intake_active': True,
                         'intake_status': 'review',
                         'suggested_action': 'confirm_submission',
+                        'error': err_msg,
+                    }
+                except Exception as e:
+                    logger.error("Conversational intake submission unexpected error: %s", e, exc_info=True)
+                    state['status'] = 'review'
+                    state['active'] = True
+                    reply_bn = "আবেদন জমা দেওয়ার সময় একটি ত্রুটি ঘটেছে। আপনার তথ্য সংরক্ষিত আছে। অনুগ্রহ করে আবার চেষ্টা করুন।"
+                    reply_en = "An error occurred while submitting your application. Your details are preserved. Please try confirming again."
+                    return {
+                        'reply_bn': reply_bn,
+                        'reply_en': reply_en,
+                        'intake_active': True,
+                        'intake_status': 'review',
+                        'suggested_action': 'confirm_submission',
+                        'error': str(e),
                     }
 
         # 4. Extract and validate input
@@ -528,7 +634,7 @@ class ConversationalIntakeManager:
                 'intake_active': True,
                 'intake_status': state['status'],
                 'current_slot': state.get('current_slot'),
-                'suggested_action': 'switch_to_manual',
+                'suggested_action': 'confirm_submission' if state.get('status') == 'review' else None,
             }
 
         for k, v in extracted.items():
@@ -558,7 +664,7 @@ class ConversationalIntakeManager:
                 'intake_active': True,
                 'intake_status': 'in_progress',
                 'current_slot': missing,
-                'suggested_action': 'switch_to_manual',
+                'suggested_action': None,
             }
         else:
             # All required slots are filled -> review summary screen
@@ -687,8 +793,9 @@ class MockUniversalChatService:
 
         # Conversational application intake handling
         is_intake_active = bool(intake_state and intake_state.get('active'))
-        if is_intake_active or ConversationalIntakeManager.detect_start_intent(text):
-            if not is_intake_active:
+        is_submitted = bool(intake_state and intake_state.get('status') in ('confirmed', 'submitted'))
+        if is_intake_active or is_submitted or ConversationalIntakeManager.detect_start_intent(text):
+            if not is_intake_active and not is_submitted:
                 intake_state = ConversationalIntakeManager.init_state(lang=lang)
 
             intake_res = ConversationalIntakeManager.process_turn(
@@ -767,14 +874,18 @@ DLAS_AI_SYSTEM_PROMPT = (
     "You are the DLAS (Digital Legal Aid System) AI assistant for Bangladesh. "
     "You help citizens, including vulnerable communities and minority language speakers, "
     "access legal aid services. "
-    "You can conversationally assist citizens with completing their legal aid application step-by-step. "
+    "You can conversationally assist citizens with completing their legal aid application directly in this chat step-by-step. "
+    "The conversational chat can complete and submit the application into the DLAS system without requiring the citizen to leave the chat. "
     "When assisting with applications: "
     "- Collect the required details step-by-step: full legal name, contact phone, address, legal problem, and incident description. "
     "- Ask for missing information one step at a time instead of asking for everything at once. "
     "- Understand both Bangla and English input and respond appropriately. "
     "- Do NOT invent information on behalf of the citizen. "
-    "- When all details are collected, ask the citizen to review and explicitly confirm before submission. "
-    "- If the citizen wants to switch to manual form filling, allow them to do so at /cases/apply/. "
+    "- When all details are collected, present the review summary and ask the citizen to confirm: "
+    "'Your application is complete. Please confirm submission.' (in English) / "
+    "'আপনার আবেদন সম্পূর্ণ হয়েছে। অনুগ্রহ করে জমা দেওয়ার বিষয়টি নিশ্চিত করুন।' (in Bangla). "
+    "- When the citizen confirms, the application is submitted directly through the system and assigned an Application ID. "
+    "- Do NOT simply send the user away to /cases/apply/ when they are applying conversationally. "
     "You are ASSISTIVE ONLY — you cannot determine legal eligibility, reject applications, "
     "approve applications, assign lawyers, or make any final legal or officer decisions. "
     "Respond bilingually (English and Bangla) unless the user clearly prefers one language. "
@@ -831,8 +942,9 @@ class RealGeminiService:
 
         # Conversational application intake handling
         is_intake_active = bool(intake_state and intake_state.get('active'))
-        if is_intake_active or ConversationalIntakeManager.detect_start_intent(text):
-            if not is_intake_active:
+        is_submitted = bool(intake_state and intake_state.get('status') in ('confirmed', 'submitted'))
+        if is_intake_active or is_submitted or ConversationalIntakeManager.detect_start_intent(text):
+            if not is_intake_active and not is_submitted:
                 intake_state = ConversationalIntakeManager.init_state(lang=lang)
 
             intake_res = ConversationalIntakeManager.process_turn(
@@ -843,8 +955,8 @@ class RealGeminiService:
             )
 
             status = intake_res.get('intake_status')
-            # Authoritative transitions: confirmed, cancelled, manual form, review card, or validation error
-            if status in ('confirmed', 'cancelled', 'manual_form', 'review') or '⚠️' in intake_res.get('reply_bn', ''):
+            # Authoritative transitions: confirmed, submitted, cancelled, manual form, review card, or validation error
+            if status in ('confirmed', 'submitted', 'cancelled', 'manual_form', 'review') or '⚠️' in intake_res.get('reply_bn', ''):
                 res = cls._build_response_dict(intake_res['reply_en'], intake_res['reply_bn'], extra=intake_res)
                 res['intake_state'] = intake_state
                 return res
@@ -1045,8 +1157,9 @@ class RealOpenAIService:
 
         # Conversational application intake handling
         is_intake_active = bool(intake_state and intake_state.get('active'))
-        if is_intake_active or ConversationalIntakeManager.detect_start_intent(text):
-            if not is_intake_active:
+        is_submitted = bool(intake_state and intake_state.get('status') in ('confirmed', 'submitted'))
+        if is_intake_active or is_submitted or ConversationalIntakeManager.detect_start_intent(text):
+            if not is_intake_active and not is_submitted:
                 intake_state = ConversationalIntakeManager.init_state(lang=lang)
 
             intake_res = ConversationalIntakeManager.process_turn(

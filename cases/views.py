@@ -1368,10 +1368,17 @@ def universal_ai_chat_message(request):
         result['api_unavailable'] = True
 
     # Persist or clear intake state in session
-    if result.get('intake_active'):
-        request.session['ai_intake_state'] = result.get('intake_state', intake_state)
+    updated_state = result.get('intake_state', intake_state)
+    if result.get('intake_active') or result.get('intake_status') in ('confirmed', 'submitted'):
+        request.session['ai_intake_state'] = updated_state
+    elif result.get('intake_status') in ('cancelled', 'manual_form'):
+        request.session['ai_intake_state'] = None
     else:
         request.session['ai_intake_state'] = None
+
+    app_id = result.get('application_id')
+    if app_id:
+        request.session['last_submitted_app_id'] = app_id
 
     # Persist conversation server-side (cap at 20 turns)
     history.append({'role': 'user', 'text_en': message, 'text_bn': message})
@@ -1380,6 +1387,8 @@ def universal_ai_chat_message(request):
         history = history[-20:]
     request.session['ai_chat_history'] = history
     request.session.modified = True
+
+    app_url = result.get('application_url') or (reverse('cases:application_detail', kwargs={'application_id': app_id}) if app_id else None)
 
     return JsonResponse({
         'reply_en': result['reply_en'],
@@ -1390,7 +1399,8 @@ def universal_ai_chat_message(request):
         'suggested_action': result.get('suggested_action'),
         'intake_active': result.get('intake_active', False),
         'intake_status': result.get('intake_status'),
-        'application_id': result.get('application_id'),
+        'application_id': app_id,
+        'application_url': app_url,
         'manual_form_url': result.get('manual_form_url'),
         'current_slot': result.get('current_slot'),
         'disclaimer_en': result.get('disclaimer_en', ''),
@@ -1398,6 +1408,7 @@ def universal_ai_chat_message(request):
         'label_en': result.get('label_en', ''),
         'label_bn': result.get('label_bn', ''),
         'api_unavailable': result.get('api_unavailable', False),
+        'error': result.get('error'),
     })
 
 

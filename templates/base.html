@@ -277,51 +277,7 @@
         .then(function(r) { return r.json(); })
         .then(function(data) {
           self.removeTyping();
-          var reply = LANG === 'bn' ? data.reply_bn : data.reply_en;
-          self.addMessage(reply, 'assistant');
-
-          // Render conversational intake action buttons if relevant
-          var box = document.getElementById('ai-chat-messages');
-          if (data.suggested_action === 'confirm_submission') {
-            var actionDiv = document.createElement('div');
-            actionDiv.style.cssText = 'display:flex;gap:0.4rem;flex-wrap:wrap;margin:0.25rem 0;';
-            actionDiv.innerHTML = '<button onclick="dlasChat.sendAction(\'confirm\')" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:0.35rem 0.65rem;font-size:0.8rem;cursor:pointer;font-weight:600;">' +
-              (LANG === 'bn' ? '✅ আবেদন নিশ্চিত ও জমা দিন' : '✅ Confirm & Submit Application') + '</button>' +
-              '<a href="/cases/apply/" style="background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:6px;padding:0.35rem 0.65rem;font-size:0.8rem;text-decoration:none;font-weight:600;">' +
-              (LANG === 'bn' ? '📝 ম্যানুয়াল ফর্ম' : '📝 Manual Form') + '</a>';
-            box.appendChild(actionDiv);
-            box.scrollTop = box.scrollHeight;
-          } else if (data.intake_active) {
-            var actionDiv = document.createElement('div');
-            actionDiv.style.cssText = 'margin:0.25rem 0;';
-            actionDiv.innerHTML = '<a href="/cases/apply/" style="font-size:0.75rem;color:#64748b;text-decoration:underline;">' +
-              (LANG === 'bn' ? 'ম্যানুয়াল ফর্মে পূরণ করতে চান? এখানে চাপুন →' : 'Switch to manual form? Click here →') + '</a>';
-            box.appendChild(actionDiv);
-            box.scrollTop = box.scrollHeight;
-          } else if (data.application_id) {
-            var actionDiv = document.createElement('div');
-            actionDiv.style.cssText = 'margin:0.25rem 0;';
-            actionDiv.innerHTML = '<a href="/cases/applications/' + data.application_id + '/" style="background:#2563eb;color:#fff;border-radius:6px;padding:0.35rem 0.65rem;font-size:0.8rem;text-decoration:none;display:inline-block;font-weight:600;">' +
-              (LANG === 'bn' ? '📄 আবেদন দেখুন (' + data.application_id + ')' : '📄 View Application (' + data.application_id + ')') + '</a>';
-            box.appendChild(actionDiv);
-            box.scrollTop = box.scrollHeight;
-          }
-
-          // Update label with real/simulated indicator
-          var labelEl = document.getElementById('ai-chat-label');
-          if (labelEl) {
-            labelEl.textContent = data.is_simulated
-              ? (LANG === 'bn' ? 'সিমুলেটেড AI সহকারী' : 'Simulated AI Assistant')
-              : (data.label_en || 'AI Assistant');
-          }
-          // Show API unavailable notice
-          if (data.api_unavailable) {
-            document.getElementById('ai-simulated-notice').style.display = 'block';
-          }
-          // Show Marma banner if detected
-          if (data.marma_workflow) {
-            document.getElementById('ai-marma-banner').style.display = 'block';
-          }
+          self.renderResponse(data);
         })
         .catch(function(err) {
           self.removeTyping();
@@ -332,6 +288,68 @@
             'assistant'
           );
         });
+      },
+
+      renderResponse: function(data) {
+        var box = document.getElementById('ai-chat-messages');
+
+        // Remove previous pending action buttons to prevent stale/duplicate clicks
+        var oldActions = box.querySelectorAll('.ai-action-buttons');
+        oldActions.forEach(function(el) { el.remove(); });
+
+        var reply = LANG === 'bn' ? data.reply_bn : data.reply_en;
+        this.addMessage(reply, 'assistant');
+
+        // Success state: Clear "Application Complete" indicator, Application ID, and links
+        if (data.application_id || data.intake_status === 'confirmed' || data.intake_status === 'submitted') {
+          var appUrl = data.application_url || ('/cases/applications/' + data.application_id + '/');
+          var actionDiv = document.createElement('div');
+          actionDiv.className = 'ai-action-buttons';
+          actionDiv.style.cssText = 'background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:0.6rem 0.75rem;margin:0.35rem 0;display:flex;flex-direction:column;gap:0.4rem;';
+          actionDiv.innerHTML = '<div style="font-size:0.85rem;font-weight:700;color:#15803d;display:flex;align-items:center;gap:0.3rem;">' +
+            '✅ ' + (LANG === 'bn' ? 'আবেদন সম্পন্ন (Application Complete)' : 'Application Complete') +
+            '</div>' +
+            '<div style="display:flex;gap:0.4rem;flex-wrap:wrap;">' +
+            '<a href="' + appUrl + '" style="background:#2563eb;color:#fff;border-radius:6px;padding:0.38rem 0.75rem;font-size:0.8rem;text-decoration:none;display:inline-block;font-weight:600;">' +
+            (LANG === 'bn' ? '📄 আবেদন দেখুন (' + data.application_id + ')' : '📄 View Application (' + data.application_id + ')') + '</a>' +
+            '<a href="/dashboard/citizen/" style="background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:6px;padding:0.38rem 0.75rem;font-size:0.8rem;text-decoration:none;display:inline-block;font-weight:600;">' +
+            (LANG === 'bn' ? '🏠 নাগরিক ড্যাশবোর্ড' : '🏠 Citizen Dashboard') + '</a>' +
+            '</div>';
+          box.appendChild(actionDiv);
+          box.scrollTop = box.scrollHeight;
+        } else if (data.suggested_action === 'confirm_submission' || data.intake_status === 'review') {
+          // Review state: Clear bilingual review instruction and direct submission button
+          var actionDiv = document.createElement('div');
+          actionDiv.className = 'ai-action-buttons';
+          actionDiv.style.cssText = 'background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:0.6rem 0.75rem;margin:0.35rem 0;display:flex;flex-direction:column;gap:0.4rem;';
+          actionDiv.innerHTML = '<div style="font-size:0.82rem;font-weight:700;color:#1e40af;">' +
+            (LANG === 'bn' ? '📋 আপনার আবেদন সম্পূর্ণ হয়েছে। অনুগ্রহ করে জমা দেওয়ার বিষয়টি নিশ্চিত করুন।' : '📋 Your application is complete. Please confirm submission.') +
+            '</div>' +
+            '<div style="display:flex;gap:0.4rem;flex-wrap:wrap;">' +
+            '<button id="ai-confirm-submit-btn" onclick="dlasChat.sendAction(\'confirm\')" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:0.4rem 0.85rem;font-size:0.82rem;cursor:pointer;font-weight:600;">' +
+            (LANG === 'bn' ? '✅ নিশ্চিত করুন ও জমা দিন' : '✅ Confirm & Submit Application') + '</button>' +
+            '</div>';
+          box.appendChild(actionDiv);
+          box.scrollTop = box.scrollHeight;
+        }
+
+        // Update label with real/simulated indicator
+        var labelEl = document.getElementById('ai-chat-label');
+        if (labelEl) {
+          labelEl.textContent = data.is_simulated
+            ? (LANG === 'bn' ? 'সিমুলেটেড AI সহকারী' : 'Simulated AI Assistant')
+            : (data.label_en || 'AI Assistant');
+        }
+        // Show API unavailable notice
+        var notice = document.getElementById('ai-simulated-notice');
+        if (notice) {
+          notice.style.display = data.api_unavailable ? 'block' : 'none';
+        }
+        // Show Marma banner if detected
+        var marmaBanner = document.getElementById('ai-marma-banner');
+        if (marmaBanner) {
+          marmaBanner.style.display = data.marma_workflow ? 'block' : 'none';
+        }
       },
 
       sendAction: function(action) {
@@ -349,21 +367,16 @@
         .then(function(r) { return r.json(); })
         .then(function(data) {
           self.removeTyping();
-          var reply = LANG === 'bn' ? data.reply_bn : data.reply_en;
-          self.addMessage(reply, 'assistant');
-          if (data.application_id) {
-            var box = document.getElementById('ai-chat-messages');
-            var actionDiv = document.createElement('div');
-            actionDiv.style.cssText = 'margin:0.25rem 0;';
-            actionDiv.innerHTML = '<a href="/cases/applications/' + data.application_id + '/" style="background:#2563eb;color:#fff;border-radius:6px;padding:0.35rem 0.65rem;font-size:0.8rem;text-decoration:none;display:inline-block;font-weight:600;">' +
-              (LANG === 'bn' ? '📄 আবেদন দেখুন (' + data.application_id + ')' : '📄 View Application (' + data.application_id + ')') + '</a>';
-            box.appendChild(actionDiv);
-            box.scrollTop = box.scrollHeight;
-          }
+          self.renderResponse(data);
         })
         .catch(function() {
           self.removeTyping();
-          self.addMessage(LANG === 'bn' ? 'সংযোগ ত্রুটি।' : 'Connection error.', 'assistant');
+          self.addMessage(
+            LANG === 'bn'
+              ? 'সংযোগ ত্রুটি। অনুগ্রহ করে আবার চেষ্টা করুন।'
+              : 'Connection error. Please try again.',
+            'assistant'
+          );
         });
       },
 
